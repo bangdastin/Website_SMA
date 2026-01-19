@@ -43,20 +43,28 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 // ==================================================================
 // 4. KONEKSI DATABASE (MYSQL ONLY)
 // ==================================================================
-const db = mysql.createConnection({
+// ==================================================================
+// 4. KONEKSI DATABASE (MENGGUNAKAN POOL AGAR STABIL DI VERCEL)
+// ==================================================================
+const db = mysql.createPool({
     host: process.env.MYSQL_HOST || 'switchyard.proxy.rlwy.net',
     user: process.env.MYSQL_USER || 'root',
     password: process.env.MYSQL_PASSWORD || 'ldPVuVjLsjeHNEwqBGvoYusjviOgAtuJ',      
     database: process.env.MYSQL_NAME || 'railway', 
-    port: process.env.MYSQL_PORT || 21815         
+    port: process.env.MYSQL_PORT || 21815,
+    waitForConnections: true,
+    connectionLimit: 10,
+    queueLimit: 0
 });
 
-db.connect((err) => {
+// Cek koneksi saat server mulai (Hanya untuk log, bukan untuk membuka koneksi terus menerus)
+db.getConnection((err, connection) => {
     if (err) {
         console.error('❌ MYSQL ERROR:', err.message);
-        console.error('⚠️ Pastikan Anda sudah setting Environment Variables di Vercel!');
+        console.error('⚠️ Pastikan Database Railway menyala dan kredensial benar.');
     } else {
-        console.log('✅ BERHASIL TERHUBUNG KE MYSQL!');
+        console.log('✅ BERHASIL TERHUBUNG KE MYSQL (MODE POOL)!');
+        connection.release(); // PENTING: Kembalikan koneksi ke kolam agar bisa dipakai user lain
     }
 });
 
