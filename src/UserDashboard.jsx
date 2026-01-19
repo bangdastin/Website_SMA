@@ -246,8 +246,22 @@ const UserDashboard = ({ user }) => {
   const fetchUserStatus = useCallback(async () => {
     if (!user?.email) return;
 
+    // Definisikan URL Vercel
+    const VERCEL_BACKEND_URL = "https://website-sma-y1ls-4vy3hvenx-bangdastins-projects.vercel.app";
+    
+    // Logika Otomatis: Jika di localhost, pakai localhost. Jika di Vercel, pakai URL Vercel/Kosong.
+    const API_BASE_URL = window.location.hostname === 'localhost' 
+        ? VERCEL_BACKEND_URL // Di laptop pun kita tembak ke Vercel biar tidak error
+        : ""; 
+
     try {
-        const response = await fetch(`http://10.5.46.195:5000/api/user-status?email=${user.email}`);
+        // --- KODE LAMA (DICOMMENT SESUAI REQUEST) ---
+        // const response = await fetch(`http://10.5.46.195:5000/api/user-status?email=${user.email}`);
+        
+        // --- KODE BARU (MENGGUNAKAN URL VERCEL) ---
+        // Kita gunakan API_BASE_URL agar aman, atau langsung VERCEL_BACKEND_URL
+        const response = await fetch(`${VERCEL_BACKEND_URL}/api/user-status?email=${user.email}`);
+        
         const data = await response.json();
 
         if (data.registered) {
