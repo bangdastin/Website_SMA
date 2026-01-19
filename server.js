@@ -25,26 +25,19 @@ const PORT = process.env.PORT || 5000;
 const SERPAPI_KEY = process.env.SERPAPI_KEY || '543c23317076911b0c2648de7597a0ede38d4187a41a01d58c1047bf7e9149dc'; 
 
 // ==================================================================
-// 3. MIDDLEWARE (FIX 405 METHOD NOT ALLOWED)
+// 3. MIDDLEWARE
 // ==================================================================
 app.use(cors({
-  origin: "*", // Mengizinkan akses dari semua sumber
-  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"], // Pastikan OPTIONS ada
+  origin: "*", 
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"], 
   allowedHeaders: ["Content-Type", "Authorization"]
 })); 
 
-// TAMBAHAN PENTING: Handle Pre-flight Request secara eksplisit
-//app.options('*', cors());
-
 app.use(express.json()); 
-
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // ==================================================================
-// 4. KONEKSI DATABASE (MYSQL ONLY)
-// ==================================================================
-// ==================================================================
-// 4. KONEKSI DATABASE (MENGGUNAKAN POOL AGAR STABIL DI VERCEL)
+// 4. KONEKSI DATABASE (MENGGUNAKAN POOL)
 // ==================================================================
 const db = mysql.createPool({
     host: process.env.MYSQL_HOST || 'switchyard.proxy.rlwy.net',
@@ -57,14 +50,14 @@ const db = mysql.createPool({
     queueLimit: 0
 });
 
-// Cek koneksi saat server mulai (Hanya untuk log, bukan untuk membuka koneksi terus menerus)
+// Cek koneksi saat server mulai
 db.getConnection((err, connection) => {
     if (err) {
         console.error('❌ MYSQL ERROR:', err.message);
         console.error('⚠️ Pastikan Database Railway menyala dan kredensial benar.');
     } else {
         console.log('✅ BERHASIL TERHUBUNG KE MYSQL (MODE POOL)!');
-        connection.release(); // PENTING: Kembalikan koneksi ke kolam agar bisa dipakai user lain
+        connection.release(); 
     }
 });
 
@@ -82,10 +75,11 @@ const transporter = nodemailer.createTransport({
 });
 
 // ==================================================================
-// 6. KONFIGURASI UPLOAD (MULTER - VERCEL COMPATIBLE)
+// 6. KONFIGURASI UPLOAD (MULTER)
 // ==================================================================
 const storage = multer.diskStorage({
     destination: function (req, file, cb) {
+        // PERINGATAN: Di Vercel, folder ini bersifat sementara (Ephemeral)
         const isVercel = process.env.VERCEL === '1';
         const dir = isVercel ? '/tmp' : path.join(__dirname, 'uploads');
 
@@ -126,13 +120,15 @@ app.post('/api/auth/register', (req, res) => {
         if (err) return res.status(500).json({ error: "Database error saat cek user." });
         if (results.length > 0) return res.status(400).json({ message: "Email, NIK, atau Username sudah terdaftar!" });
 
-        const sql1 = "INSERT INTO users1 (nik, username, email, password) VALUES (?, ?, ?, ?)";
+        // Insert ke users1 (Akun Login)
+        const sql1 = "INSERT INTO users1 (nik, username, email, password, role) VALUES (?, ?, ?, ?, 'user')";
         db.query(sql1, [nik, username, email, password], (err, result1) => {
             if (err) {
                 console.error("❌ Error Insert users1:", err);
                 return res.status(500).json({ error: "Gagal membuat akun login." });
             }
 
+            // Insert ke users (Data Siswa)
             const sql2 = "INSERT INTO users (nik, username, email, status_pendaftaran) VALUES (?, ?, ?, 'Belum')";
             db.query(sql2, [nik, username, email], (err, result2) => {
                 if (err) console.error("⚠️ Warning Insert users:", err);
@@ -156,9 +152,16 @@ app.post('/api/auth/login', (req, res) => {
         
         if (results.length > 0) {
             const user = results[0];
+            // PERBAIKAN PENTING: Mengirimkan ROLE ke frontend
             res.status(200).json({ 
                 message: "Login Berhasil", 
-                user: { id: user.id, username: user.username, email: user.email, nik: user.nik }
+                user: { 
+                    id: user.id, 
+                    username: user.username, 
+                    email: user.email, 
+                    nik: user.nik,
+                    role: user.role || 'user' // Kirim role (admin/user)
+                }
             });
         } else {
             res.status(401).json({ message: "Username atau Password salah!" });
@@ -179,7 +182,8 @@ app.post('/api/auth/forgot-password', (req, res) => {
         db.query(updateSql, [token, expires, email], (err) => {
             if (err) return res.status(500).json({ message: "Gagal generate token." });
 
-            const baseUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+            // Gunakan URL Referer atau default localhost jika tidak ada
+            const baseUrl = req.headers.origin || 'http://localhost:5173';
             const resetLink = `${baseUrl}/?view=reset&token=${token}`; 
 
             const mailOptions = {
@@ -223,6 +227,7 @@ app.get('/api/user-status', (req, res) => {
     const { email } = req.query;
     if (!email) return res.status(400).json({ message: "Email diperlukan" });
 
+    // Mengambil data dari tabel users (bukan users1) untuk profil siswa
     const sql = "SELECT * FROM users WHERE email = ?";
     db.query(sql, [email], (err, results) => {
         if (err) return res.status(500).json({ error: err.message });
@@ -278,6 +283,7 @@ app.post('/api/upload-payment', upload.single('buktiBayar'), (req, res) => {
 // ==================================================================
 
 app.get('/api/users', (req, res) => {
+    // Mengambil data pendaftar dari tabel users untuk ditampilkan di dashboard admin
     db.query("SELECT * FROM users ORDER BY id DESC", (err, results) => {
         if (err) return res.status(500).json({ error: err.message });
         res.json(results);
@@ -325,16 +331,13 @@ app.get('/api/search-school', async (req, res) => {
 });
 
 // ==================================================================
-// 10. JALANKAN SERVER (UPDATE UNTUK VERCEL)
+// 10. JALANKAN SERVER
 // ==================================================================
 
 if (!process.env.VERCEL) {
-    // Jalankan server hanya jika BUKAN di Vercel (misal: di Laptop/Local)
     app.listen(PORT, '0.0.0.0', () => { 
         console.log(`🚀 Server Backend MySQL berjalan di port ${PORT}...`);
-        console.log(`📡 Host Database: ${process.env.MYSQL_HOST || 'localhost'}`);
     });
 }
 
-// Export app agar Vercel bisa membacanya sebagai Serverless Function
 export default app;
