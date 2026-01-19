@@ -20,12 +20,12 @@ const AuthPage = ({ onLoginSuccess, onBackToHome, initialView = 'login', resetTo
   // =================================================================
   // 1. KONFIGURASI URL BACKEND (OTOMATIS)
   // =================================================================
-  // Link Vercel Anda (Diambil dari screenshot error sebelumnya)
+  // Link Vercel Anda
   const VERCEL_BACKEND_URL = "https://website-sma-y1ls-4vy3hvenx-bangdastins-projects.vercel.app";
 
   // Logika: 
-  // - Jika buka di Localhost, tembak ke Vercel (agar tidak error connection refused).
-  // - Jika buka di Vercel, gunakan path kosong (relative) agar otomatis.
+  // - Jika buka di Localhost, tembak ke Vercel (atau localhost jika backend nyala).
+  // - Jika buka di Vercel, gunakan path kosong (relative).
   const API_BASE_URL = window.location.hostname === 'localhost' 
     ? VERCEL_BACKEND_URL 
     : ""; 
@@ -71,7 +71,7 @@ const AuthPage = ({ onLoginSuccess, onBackToHome, initialView = 'login', resetTo
     return null;
   };
 
-  // --- HANDLER LOGIN ---
+  // --- HANDLER LOGIN (DIPERBAIKI UNTUK ADMIN) ---
   const handleLogin = async (e) => {
     e.preventDefault();
     setIsLoading(true); setMessage({ type: '', text: '' });
@@ -84,12 +84,26 @@ const AuthPage = ({ onLoginSuccess, onBackToHome, initialView = 'login', resetTo
       const data = await res.json();
 
       if (res.ok) {
+        // Simpan data user (termasuk role) ke LocalStorage
         localStorage.setItem('userApp', JSON.stringify(data.user));
-        showSuccessAnimation("Login Berhasil!", () => onLoginSuccess(data.user));
+        
+        showSuccessAnimation("Login Berhasil!", () => {
+            // --- LOGIKA PENGECEKAN ROLE ---
+            if (data.user.role === 'admin') {
+                // Jika Role adalah Admin, arahkan paksa ke /admin
+                window.location.href = "/admin";
+            } else {
+                // Jika Role User biasa, jalankan fungsi normal
+                onLoginSuccess(data.user);
+            }
+        });
       } else {
         setMessage({ type: 'error', text: data.message });
       }
-    } catch (err) { setMessage({ type: 'error', text: 'Gagal terhubung ke server.' }); } 
+    } catch (err) { 
+        console.error(err);
+        setMessage({ type: 'error', text: 'Gagal terhubung ke server.' }); 
+    } 
     finally { setIsLoading(false); }
   };
 
@@ -176,7 +190,7 @@ const AuthPage = ({ onLoginSuccess, onBackToHome, initialView = 'login', resetTo
                     <CheckCircle2 size={40} className="animate-bounce" />
                 </div>
                 <h3 className="text-xl font-bold text-slate-800">{successModal.text}</h3>
-                <p className="text-slate-500 mt-2 text-xs">Mengalihkan ke halaman Login...</p>
+                <p className="text-slate-500 mt-2 text-xs">Mengalihkan halaman...</p>
                 <div className="mt-6 w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
                     <div className="h-full bg-green-500 w-full transition-all duration-[2000ms] ease-linear origin-left animate-pulse"></div>
                 </div>
