@@ -34,7 +34,7 @@ app.use(cors({
 })); 
 
 // TAMBAHAN PENTING: Handle Pre-flight Request secara eksplisit
-app.options('*', cors());
+//app.options('*', cors());
 
 app.use(express.json()); 
 
