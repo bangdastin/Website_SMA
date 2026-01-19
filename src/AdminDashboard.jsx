@@ -5,8 +5,13 @@ import {
 
 // --- KONFIGURASI IP (PENTING) ---
 // Pastikan ini sama dengan yang ada di server.js dan UploadPayment.jsx
-const API_BASE_URL = "http://10.5.46.195:5000"; 
+//const API_BASE_URL = "http://10.5.46.195:5000"; 
+// 1. Link Vercel Anda
+const VERCEL_BACKEND_URL = "https:/website-sma-bangdastins-projects.vercel.app"
 
+const API_BASE_URL = window.location.hostname === 'localhost' 
+  ? VERCEL_BACKEND_URL // <--- Jika di Laptop, tembak langsung ke Online
+  : "";
 // --- 1. SIDEBAR ---
 const Sidebar = ({ isOpen }) => {
   const menus = [

@@ -21,7 +21,7 @@ const AuthPage = ({ onLoginSuccess, onBackToHome, initialView = 'login', resetTo
   // 1. KONFIGURASI URL BACKEND (OTOMATIS)
   // =================================================================
   // Link Vercel Anda (Diambil dari screenshot error sebelumnya)
-  const VERCEL_BACKEND_URL = "https://website-sma-y1ls-4vy3hvenx-bangdastins-projects.vercel.app";
+  const VERCEL_BACKEND_URL = "https:/website-sma-bangdastins-projects.vercel.app";
 
   // Logika: 
   // - Jika buka di Localhost, tembak ke Vercel (agar tidak error connection refused).
