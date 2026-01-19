@@ -44,11 +44,11 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 // 4. KONEKSI DATABASE (MYSQL ONLY)
 // ==================================================================
 const db = mysql.createConnection({
-    host: process.env.MYSQL_HOST || 'localhost',
+    host: process.env.MYSQL_HOST || 'switchyard.proxy.rlwy.net',
     user: process.env.MYSQL_USER || 'root',
-    password: process.env.MYSQL_PASSWORD || '',      
-    database: process.env.MYSQL_NAME || 'website_sma', 
-    port: process.env.MYSQL_PORT || 3306         
+    password: process.env.MYSQL_PASSWORD || 'ldPVuVjLsjeHNEwqBGvoYusjviOgAtuJ',      
+    database: process.env.MYSQL_NAME || 'railway', 
+    port: process.env.MYSQL_PORT || 21815         
 });
 
 db.connect((err) => {
