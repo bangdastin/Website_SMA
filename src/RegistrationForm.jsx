@@ -25,7 +25,12 @@ const RegistrationForm = ({ onSuccess, onGoHome, userData }) => {
   const dropdownRef = useRef(null);
   
   // IP LAPTOP ANDA
-  const API_BASE_URL = "http://10.5.46.195:5000";
+  //const API_BASE_URL = "http://10.5.46.195:5000";
+  const VERCEL_BACKEND_URL = "https://website-sma-y1ls-4vy3hvenx-bangdastins-projects.vercel.app"
+
+const API_BASE_URL = window.location.hostname === 'localhost' 
+  ? VERCEL_BACKEND_URL // <--- Jika di Laptop, tembak langsung ke Online
+  : "";
 
   // --- LOGIKA UTAMA: AUTO FILL EMAIL & CEK STATUS ---
   useEffect(() => {

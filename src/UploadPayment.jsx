@@ -11,7 +11,12 @@ const UploadPayment = ({ userEmail, onUploadSuccess, currentStatus, buktiBayar }
   const [isLoading, setIsLoading] = useState(false);
   const [message, setMessage] = useState({ type: '', text: '' });
 
-  const API_BASE_URL = "http://10.5.46.195:5000"; 
+  //const API_BASE_URL = "http://10.5.46.195:5000"; 
+  const VERCEL_BACKEND_URL = "https://website-sma-y1ls-4vy3hvenx-bangdastins-projects.vercel.app"
+
+const API_BASE_URL = window.location.hostname === 'localhost' 
+  ? VERCEL_BACKEND_URL // <--- Jika di Laptop, tembak langsung ke Online
+  : "";
   const NOMOR_PANITIA = "6281234567890"; 
 
   const handleContactWA = () => {
