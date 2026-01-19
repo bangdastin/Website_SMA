@@ -325,4 +325,4 @@ const AuthPage = ({ onLoginSuccess, onBackToHome, initialView = 'login', resetTo
   );
 };
 
-export default AuthPage;git add .
+export default AuthPage;
