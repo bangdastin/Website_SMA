@@ -25,13 +25,17 @@ const PORT = process.env.PORT || 5000;
 const SERPAPI_KEY = process.env.SERPAPI_KEY || '543c23317076911b0c2648de7597a0ede38d4187a41a01d58c1047bf7e9149dc'; 
 
 // ==================================================================
-// 3. MIDDLEWARE
+// 3. MIDDLEWARE (FIX 405 METHOD NOT ALLOWED)
 // ==================================================================
 app.use(cors({
   origin: "*", // Mengizinkan akses dari semua sumber
-  methods: ["GET", "POST", "PUT", "DELETE"],
-  allowedHeaders: ["Content-Type"]
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"], // Pastikan OPTIONS ada
+  allowedHeaders: ["Content-Type", "Authorization"]
 })); 
+
+// TAMBAHAN PENTING: Handle Pre-flight Request secara eksplisit
+app.options('*', cors());
+
 app.use(express.json()); 
 
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
@@ -315,9 +319,6 @@ app.get('/api/search-school', async (req, res) => {
 // ==================================================================
 // 10. JALANKAN SERVER (UPDATE UNTUK VERCEL)
 // ==================================================================
-
-// Logika ini penting agar berjalan di Localhost (app.listen) 
-// TETAPI juga bisa di-export untuk Vercel (export default app)
 
 if (!process.env.VERCEL) {
     // Jalankan server hanya jika BUKAN di Vercel (misal: di Laptop/Local)
