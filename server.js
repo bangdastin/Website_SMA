@@ -39,25 +39,21 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 // ==================================================================
 // 4. KONEKSI DATABASE (MENGGUNAKAN POOL)
 // ==================================================================
-const db = mysql.createPool({
-    host: process.env.MYSQL_HOST || 'switchyard.proxy.rlwy.net',
+const db = mysql.createConnection({
+    host: process.env.MYSQL_HOST || 'localhost',
     user: process.env.MYSQL_USER || 'root',
-    password: process.env.MYSQL_PASSWORD || 'ldPVuVjLsjeHNEwqBGvoYusjviOgAtuJ',      
-    database: process.env.MYSQL_NAME || 'railway', 
-    port: process.env.MYSQL_PORT || 21815,
-    waitForConnections: true,
-    connectionLimit: 10,
-    queueLimit: 0
+    password: process.env.MYSQL_PASSWORD || '',      
+    database: process.env.MYSQL_NAME || 'website_sma', 
+    port: process.env.MYSQL_PORT || 3306,
+    dateStrings: true // PENTING: Agar tanggal tidak berubah karena timezone
 });
 
 // Cek koneksi saat server mulai
-db.getConnection((err, connection) => {
+db.connect((err) => {
     if (err) {
         console.error('❌ MYSQL ERROR:', err.message);
-        console.error('⚠️ Pastikan Database Railway menyala dan kredensial benar.');
     } else {
-        console.log('✅ BERHASIL TERHUBUNG KE MYSQL (MODE POOL)!');
-        connection.release(); 
+        console.log('✅ MYSQL TERHUBUNG!');
     }
 });
 
@@ -79,7 +75,6 @@ const transporter = nodemailer.createTransport({
 // ==================================================================
 const storage = multer.diskStorage({
     destination: function (req, file, cb) {
-        // PERINGATAN: Di Vercel, folder ini bersifat sementara (Ephemeral)
         const isVercel = process.env.VERCEL === '1';
         const dir = isVercel ? '/tmp' : path.join(__dirname, 'uploads');
 
@@ -90,7 +85,7 @@ const storage = multer.diskStorage({
     },
     filename: function (req, file, cb) {
         const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-        cb(null, 'bukti-' + uniqueSuffix + path.extname(file.originalname)); 
+        cb(null, 'img-' + uniqueSuffix + path.extname(file.originalname)); 
     }
 });
 
@@ -113,26 +108,36 @@ const upload = multer({
 app.post('/api/auth/register', (req, res) => {
     const { nik, username, email, password } = req.body;
     
-    console.log("📝 Register Request:", { email, username });
+    if (!nik || !username || !email || !password) {
+        return res.status(400).json({ message: "Data tidak lengkap!" });
+    }
 
     const checkSql = "SELECT * FROM users1 WHERE email = ? OR nik = ? OR username = ?";
     db.query(checkSql, [email, nik, username], (err, results) => {
         if (err) return res.status(500).json({ error: "Database error saat cek user." });
         if (results.length > 0) return res.status(400).json({ message: "Email, NIK, atau Username sudah terdaftar!" });
 
-        // Insert ke users1 (Akun Login)
-        const sql1 = "INSERT INTO users1 (nik, username, email, password, role) VALUES (?, ?, ?, ?, 'user')";
+        // Insert ke users1 (Akun Login) - TANPA ROLE
+        const sql1 = "INSERT INTO users1 (nik, username, email, password) VALUES (?, ?, ?, ?)";
         db.query(sql1, [nik, username, email, password], (err, result1) => {
-            if (err) {
-                console.error("❌ Error Insert users1:", err);
-                return res.status(500).json({ error: "Gagal membuat akun login." });
-            }
+            if (err) return res.status(500).json({ error: "Gagal membuat akun login.", details: err.message });
 
             // Insert ke users (Data Siswa)
             const sql2 = "INSERT INTO users (nik, username, email, status_pendaftaran) VALUES (?, ?, ?, 'Belum')";
             db.query(sql2, [nik, username, email], (err, result2) => {
-                if (err) console.error("⚠️ Warning Insert users:", err);
-                res.status(200).json({ message: "Registrasi Berhasil! Silakan Login." });
+                if (err) console.error("⚠️ Warning Insert users:", err.message);
+                
+                // Return Data User agar Frontend bisa Auto-Login
+                res.status(200).json({ 
+                    message: "Registrasi Berhasil! Silakan Login.",
+                    user: {
+                        id: result1.insertId,
+                        username: username,
+                        email: email,
+                        nik: nik,
+                        role: 'user'
+                    }
+                });
             });
         });
     });
@@ -152,7 +157,15 @@ app.post('/api/auth/login', (req, res) => {
         
         if (results.length > 0) {
             const user = results[0];
-            // PERBAIKAN PENTING: Mengirimkan ROLE ke frontend
+            
+            // LOGIKA ADMIN MANUAL (Hardcoded Email)
+            // Jika email terdaftar di sini -> Admin. Selain itu -> User.
+            const adminEmails = ['geraldnael@gmail.com', 'admin@sekolah.id']; 
+            // const userRole = adminEmails.includes(user.email) ? 'admin' : 'user'; 
+            
+            // JIKA MAU SEMUA MASUK USER DASHBOARD, PAKSA JADI 'user'
+            const userRole = 'user'; 
+
             res.status(200).json({ 
                 message: "Login Berhasil", 
                 user: { 
@@ -160,7 +173,7 @@ app.post('/api/auth/login', (req, res) => {
                     username: user.username, 
                     email: user.email, 
                     nik: user.nik,
-                    role: user.role || 'user' // Kirim role (admin/user)
+                    role: userRole 
                 }
             });
         } else {
@@ -182,7 +195,6 @@ app.post('/api/auth/forgot-password', (req, res) => {
         db.query(updateSql, [token, expires, email], (err) => {
             if (err) return res.status(500).json({ message: "Gagal generate token." });
 
-            // Gunakan URL Referer atau default localhost jika tidak ada
             const baseUrl = req.headers.origin || 'http://localhost:5173';
             const resetLink = `${baseUrl}/?view=reset&token=${token}`; 
 
@@ -223,15 +235,52 @@ app.post('/api/auth/reset-password', (req, res) => {
 // 8. API ENDPOINTS (DATA SISWA & REGISTRASI)
 // ==================================================================
 
+// --- [PERBAIKAN UTAMA: FETCH PROFIL DENGAN FALLBACK] ---
+app.get('/api/users/:id', (req, res) => {
+    const { id } = req.params; // ID dari users1 (akun login)
+
+    // 1. Ambil Data Akun
+    db.query("SELECT * FROM users1 WHERE id = ?", [id], (err, results) => {
+        if (err) return res.status(500).json({ error: err.message });
+        
+        if (results.length === 0) return res.status(404).json({ message: "User Account not found" });
+
+        const userAccount = results[0];
+
+        // 2. Ambil Data Profil berdasarkan Email
+        db.query("SELECT * FROM users WHERE email = ?", [userAccount.email], (err2, profiles) => {
+            if (err2) return res.status(500).json({ error: err2.message });
+
+            if (profiles.length > 0) {
+                // Profil Ditemukan -> Return data lengkap
+                res.json({
+                    ...profiles[0],
+                    id: userAccount.id // Pastikan ID yang dikembalikan adalah ID Akun agar konsisten
+                });
+            } else {
+                // Profil TIDAK Ditemukan -> Return Data Dummy (Agar frontend tidak error 404 loop)
+                res.json({
+                    id: userAccount.id,
+                    email: userAccount.email,
+                    username: userAccount.username,
+                    nama_lengkap: userAccount.username, 
+                    status_pendaftaran: 'Belum',
+                    asal_sekolah: '-',
+                    no_ujian: '-',
+                    bukti_pembayaran: null
+                });
+            }
+        });
+    });
+});
+
 app.get('/api/user-status', (req, res) => {
     const { email } = req.query;
     if (!email) return res.status(400).json({ message: "Email diperlukan" });
 
-    // Mengambil data dari tabel users (bukan users1) untuk profil siswa
     const sql = "SELECT * FROM users WHERE email = ?";
     db.query(sql, [email], (err, results) => {
         if (err) return res.status(500).json({ error: err.message });
-        
         if (results.length > 0) {
             const data = results[0];
             res.json({ 
@@ -252,29 +301,80 @@ app.get('/api/user-status', (req, res) => {
 app.post('/api/register', (req, res) => {
     const { namaLengkap, email, noTelp, tglLahir, asalSekolah, alamatRumah } = req.body;
     
-    const sql = `UPDATE users SET nama_lengkap=?, no_telepon=?, tanggal_lahir=?, asal_sekolah=?, alamat_rumah=?, status_pendaftaran='Menunggu' WHERE email=?`;
-    
-    db.query(sql, [namaLengkap, noTelp, tglLahir, asalSekolah, alamatRumah, email], (err, result) => {
-        if (err) return res.status(500).json({ message: "Gagal menyimpan data", error: err });
-        if (result.affectedRows === 0) return res.status(404).json({ message: "User data tidak ditemukan." });
-        res.status(200).json({ message: "Formulir Berhasil Disimpan" });
+    // Gunakan UPDATE atau INSERT (Upsert Logic)
+    // Cek dulu apakah data sudah ada di tabel users
+    db.query("SELECT * FROM users WHERE email = ?", [email], (err, results) => {
+        if(err) return res.status(500).json({message: "Database Error"});
+
+        if(results.length > 0) {
+            // Data ada -> UPDATE
+            const sql = `UPDATE users SET nama_lengkap=?, no_telepon=?, tanggal_lahir=?, asal_sekolah=?, alamat_rumah=?, status_pendaftaran='Menunggu' WHERE email=?`;
+            db.query(sql, [namaLengkap, noTelp, tglLahir, asalSekolah, alamatRumah, email], (err, result) => {
+                if (err) return res.status(500).json({ message: "Gagal menyimpan data", error: err });
+                res.status(200).json({ message: "Formulir Berhasil Disimpan" });
+            });
+        } else {
+            // Data tidak ada -> INSERT BARU (Mengatasi jika data users hilang)
+            // Kita perlu ambil NIK/Username dari users1 dulu
+            db.query("SELECT nik, username FROM users1 WHERE email = ?", [email], (err2, res2) => {
+                if(res2.length > 0) {
+                    const { nik, username } = res2[0];
+                    const insertSql = `INSERT INTO users (nik, username, email, nama_lengkap, no_telepon, tanggal_lahir, asal_sekolah, alamat_rumah, status_pendaftaran) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'Menunggu')`;
+                    db.query(insertSql, [nik, username, email, namaLengkap, noTelp, tglLahir, asalSekolah, alamatRumah], (err3) => {
+                        if(err3) return res.status(500).json({message: "Gagal membuat data profil baru"});
+                        res.status(200).json({ message: "Formulir Berhasil Disimpan (Profil Baru Dibuat)" });
+                    });
+                } else {
+                    res.status(400).json({message: "Akun login tidak ditemukan"});
+                }
+            });
+        }
     });
 });
 
+// --- [PERBAIKAN UPLOAD: MENGGUNAKAN ID USER AGAR TIDAK SALAH UPDATE] ---
 app.post('/api/upload-payment', upload.single('buktiBayar'), (req, res) => {
+    // 1. Validasi File
     if (!req.file) return res.status(400).json({ message: "Pilih foto terlebih dahulu." });
     
-    const { email } = req.body;
-    const sql = "UPDATE users SET bukti_pembayaran = ?, status_pendaftaran = 'Menunggu' WHERE email = ?";
-    
-    db.query(sql, [req.file.filename, email], (err, result) => {
-        if (err) {
+    // 2. Validasi User ID dari FormData
+    const { userId } = req.body;
+
+    if (!userId) {
+        console.error("❌ Error: UserId tidak dikirim dari frontend");
+        return res.status(400).json({ message: "User ID tidak ditemukan dalam request." });
+    }
+
+    // 3. Cari User di tabel Akun (users1) untuk memastikan ID valid dan mendapatkan Email asli
+    db.query("SELECT email FROM users1 WHERE id = ?", [userId], (err, results) => {
+        if(err || results.length === 0) {
+            console.error("❌ Error cari user by ID:", err);
+            // Hapus file jika user tidak valid agar tidak menuh-menuhin server
             if (fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
-            return res.status(500).json({ message: "Gagal update database." });
+            return res.status(500).json({ message: "User ID tidak valid atau user tidak ditemukan." });
         }
-        res.status(200).json({ message: "Sukses Upload!", filename: req.file.filename });
+
+        const emailUser = results[0].email;
+        console.log(`📸 Uploading bukti bayar untuk User ID: ${userId} (${emailUser})`);
+
+        // 4. Update tabel Profil Siswa (users) menggunakan EMAIL yang didapat dari database (Bukan dari frontend)
+        // Ini menjamin update hanya terjadi pada user yang punya ID tersebut
+        const sql = "UPDATE users SET bukti_pembayaran = ?, status_pendaftaran = 'Menunggu' WHERE email = ?";
+        
+        db.query(sql, [req.file.filename, emailUser], (errUpdate, resUpdate) => {
+            if (errUpdate) {
+                console.error("❌ Error Update DB:", errUpdate);
+                if (fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path); 
+                return res.status(500).json({ message: "Gagal update database." });
+            }
+            
+            res.status(200).json({ message: "Sukses Upload!", filename: req.file.filename });
+        });
     });
+
 }, (error, req, res, next) => {
+    // Error Handling untuk Multer (misal file terlalu besar)
+    console.error("❌ Multer Error:", error.message);
     res.status(400).json({ message: error.message });
 });
 
@@ -283,7 +383,6 @@ app.post('/api/upload-payment', upload.single('buktiBayar'), (req, res) => {
 // ==================================================================
 
 app.get('/api/users', (req, res) => {
-    // Mengambil data pendaftar dari tabel users untuk ditampilkan di dashboard admin
     db.query("SELECT * FROM users ORDER BY id DESC", (err, results) => {
         if (err) return res.status(500).json({ error: err.message });
         res.json(results);
@@ -293,10 +392,9 @@ app.get('/api/users', (req, res) => {
 app.put('/api/users/:id/status', (req, res) => {
     const { id } = req.params;
     const { status } = req.body;
-    
     db.query("UPDATE users SET status_pendaftaran = ? WHERE id = ?", [status, id], (err, result) => {
         if (err) return res.status(500).json({ error: err.message });
-        res.json({ message: "Status berhasil diperbarui", status });
+        res.json({ message: "Status berhasil diperbarui" });
     });
 });
 
@@ -331,7 +429,123 @@ app.get('/api/search-school', async (req, res) => {
 });
 
 // ==================================================================
-// 10. JALANKAN SERVER
+// 10. API ENDPOINTS (MANAJEMEN PRESTASI)
+// ==================================================================
+
+// GET ALL PRESTASI
+app.get('/api/prestasi', (req, res) => {
+    const sql = "SELECT * FROM prestasi ORDER BY tanggal DESC";
+    db.query(sql, (err, results) => {
+        if (err) return res.status(500).json({ error: err.message });
+        res.json(results);
+    });
+});
+
+// CREATE PRESTASI
+app.post('/api/prestasi', upload.single('gambar'), (req, res) => {
+    const { judul, deskripsi, tanggal, penyelenggara } = req.body;
+    const gambar = req.file ? req.file.filename : null;
+    const sql = "INSERT INTO prestasi (judul, deskripsi, tanggal, penyelenggara, gambar) VALUES (?, ?, ?, ?, ?)";
+    db.query(sql, [judul, deskripsi, tanggal, penyelenggara, gambar], (err, result) => {
+        if (err) return res.status(500).json({ error: err.message });
+        res.status(201).json({ message: "Prestasi berhasil ditambahkan", id: result.insertId });
+    });
+});
+
+// UPDATE PRESTASI (Termasuk Update Gambar)
+app.put('/api/prestasi/:id', upload.single('gambar'), (req, res) => {
+    const { id } = req.params;
+    const { judul, deskripsi, tanggal, penyelenggara } = req.body;
+    
+    if (req.file) {
+        const newImage = req.file.filename;
+        db.query("SELECT gambar FROM prestasi WHERE id = ?", [id], (err, results) => {
+            if (results.length > 0) {
+                const oldImage = results[0].gambar;
+                if (oldImage && fs.existsSync(path.join(__dirname, 'uploads', oldImage))) {
+                    fs.unlinkSync(path.join(__dirname, 'uploads', oldImage));
+                }
+            }
+            const sql = "UPDATE prestasi SET judul=?, deskripsi=?, tanggal=?, penyelenggara=?, gambar=? WHERE id=?";
+            db.query(sql, [judul, deskripsi, tanggal, penyelenggara, newImage, id], (err) => {
+                if (err) return res.status(500).json({ error: err.message });
+                res.json({ message: "Update berhasil" });
+            });
+        });
+    } else {
+        const sql = "UPDATE prestasi SET judul=?, deskripsi=?, tanggal=?, penyelenggara=? WHERE id=?";
+        db.query(sql, [judul, deskripsi, tanggal, penyelenggara, id], (err) => {
+            if (err) return res.status(500).json({ error: err.message });
+            res.json({ message: "Update berhasil" });
+        });
+    }
+});
+
+// DELETE PRESTASI
+app.delete('/api/prestasi/:id', (req, res) => {
+    const { id } = req.params;
+    db.query("SELECT gambar FROM prestasi WHERE id = ?", [id], (err, results) => {
+        if (results.length > 0) {
+            const gambarLama = results[0].gambar;
+            db.query("DELETE FROM prestasi WHERE id = ?", [id], (err) => {
+                if (err) return res.status(500).json({ error: err.message });
+                if (gambarLama && fs.existsSync(path.join(__dirname, 'uploads', gambarLama))) {
+                    fs.unlinkSync(path.join(__dirname, 'uploads', gambarLama));
+                }
+                res.json({ message: "Berhasil dihapus" });
+            });
+        } else {
+            res.status(404).json({ message: "Data tidak ditemukan" });
+        }
+    });
+});
+
+// ==================================================================
+// 11. API ENDPOINTS (MANAJEMEN PENGUMUMAN)
+// ==================================================================
+
+// GET Pengumuman
+app.get('/api/pengumuman', (req, res) => {
+    const sql = "SELECT * FROM pengumuman ORDER BY tanggal DESC";
+    db.query(sql, (err, results) => {
+        if (err) return res.status(500).json({ error: err.message });
+        res.json(results);
+    });
+});
+
+// POST Pengumuman
+app.post('/api/pengumuman', (req, res) => {
+    const { judul, isi, tanggal } = req.body;
+    const sql = "INSERT INTO pengumuman (judul, isi, tanggal) VALUES (?, ?, ?)";
+    db.query(sql, [judul, isi, tanggal], (err, result) => {
+        if (err) return res.status(500).json({ error: err.message });
+        res.status(201).json({ message: "Pengumuman berhasil ditambahkan" });
+    });
+});
+
+// PUT Pengumuman
+app.put('/api/pengumuman/:id', (req, res) => {
+    const { id } = req.params;
+    const { judul, isi, tanggal } = req.body;
+    const sql = "UPDATE pengumuman SET judul=?, isi=?, tanggal=? WHERE id=?";
+    db.query(sql, [judul, isi, tanggal, id], (err, result) => {
+        if (err) return res.status(500).json({ error: err.message });
+        res.json({ message: "Pengumuman berhasil diupdate" });
+    });
+});
+
+// DELETE Pengumuman
+app.delete('/api/pengumuman/:id', (req, res) => {
+    const { id } = req.params;
+    const sql = "DELETE FROM pengumuman WHERE id=?";
+    db.query(sql, [id], (err, result) => {
+        if (err) return res.status(500).json({ error: err.message });
+        res.json({ message: "Pengumuman berhasil dihapus" });
+    });
+});
+
+// ==================================================================
+// 12. JALANKAN SERVER
 // ==================================================================
 
 if (!process.env.VERCEL) {

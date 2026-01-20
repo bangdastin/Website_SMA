@@ -24,13 +24,16 @@ const RegistrationForm = ({ onSuccess, onGoHome, userData }) => {
   
   const dropdownRef = useRef(null);
   
-  // IP LAPTOP ANDA
-  //const API_BASE_URL = "http://10.5.46.195:5000";
-  const VERCEL_BACKEND_URL = "https://website-sma-y1ls-4vy3hvenx-bangdastins-projects.vercel.app"
-
-const API_BASE_URL = window.location.hostname === 'localhost' 
-  ? VERCEL_BACKEND_URL // <--- Jika di Laptop, tembak langsung ke Online
-  : "";
+  // =================================================================
+  // PERBAIKAN URL SERVER (Agar Sinkron dengan Dashboard)
+  // =================================================================
+  const LOCAL_URL = "http://localhost:5000";
+  const PROD_URL = "https://website-sma-y1ls-4vy3hvenx-bangdastins-projects.vercel.app";
+  
+  const API_BASE_URL = window.location.hostname === 'localhost' 
+    ? LOCAL_URL 
+    : PROD_URL; 
+  // =================================================================
 
   // --- LOGIKA UTAMA: AUTO FILL EMAIL & CEK STATUS ---
   useEffect(() => {
@@ -38,10 +41,15 @@ const API_BASE_URL = window.location.hostname === 'localhost'
         setFormData(prev => ({ ...prev, email: userData.email }));
     }
 
+    // Mengisi data jika user sudah pernah daftar (untuk keperluan edit/view jika diperlukan nanti)
     if (userData && (userData.status === 'Menunggu' || userData.status === 'Diterima' || userData.status === 'Ditolak')) {
         setIsAlreadyRegistered(true); 
         setIsSubmitted(true); 
-        setFormData(prev => ({ ...prev, namaLengkap: userData.nama }));
+        setFormData(prev => ({ 
+            ...prev, 
+            namaLengkap: userData.nama || '',
+            asalSekolah: userData.asalSekolah || ''
+        }));
     }
   }, [userData]);
 
@@ -113,16 +121,19 @@ const API_BASE_URL = window.location.hostname === 'localhost'
     if (schoolError) { alert("Mohon perbaiki Asal Sekolah terlebih dahulu."); return; }
     
     try {
+      // Kita kirim juga ID User agar lebih aman (jika ada di userData)
+      const payload = { ...formData, userId: userData?.id };
+
       const response = await fetch(`${API_BASE_URL}/api/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData),
+        body: JSON.stringify(payload),
       });
 
       const data = await response.json();
       if (response.ok) {
         setIsSubmitted(true);
-        if (onSuccess) onSuccess(); 
+        if (onSuccess) onSuccess(); // Panggil fungsi refresh di Dashboard
       } else {
         alert("Gagal mendaftar: " + (data.error?.sqlMessage || data.message || "Terjadi kesalahan server"));
       }
@@ -150,7 +161,6 @@ const API_BASE_URL = window.location.hostname === 'localhost'
              <div className="mb-6"><span className={`px-4 py-2 rounded-full font-bold text-sm border ${userData.status === 'Menunggu' ? 'bg-yellow-50 text-yellow-700 border-yellow-200' : userData.status === 'Diterima' ? 'bg-green-50 text-green-700 border-green-200' : 'bg-red-50 text-red-700 border-red-200'}`}>Status: {userData.status}</span></div>
           )}
           
-          {/* TOMBOL KEMBALI KE DASHBOARD (PENGGANTI CHAT WA) */}
           <button onClick={onGoHome} className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-xl shadow-lg transition-all flex items-center justify-center gap-2"><Home size={20} /> Kembali ke Dashboard</button>
         </div>
       </div>
@@ -179,7 +189,6 @@ const API_BASE_URL = window.location.hostname === 'localhost'
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* === INPUT EMAIL (READ ONLY / DISABLED) === */}
             <div className="space-y-2">
               <label className="text-sm font-bold text-slate-700 flex items-center gap-2">
                 <Mail size={16} className="text-blue-600" /> Email
@@ -211,7 +220,6 @@ const API_BASE_URL = window.location.hostname === 'localhost'
               <input type="text" name="asalSekolah" required value={formData.asalSekolah} onChange={handleChange} autoComplete="off" placeholder="Ketik nama sekolah (Misal: SMPN 1 Jakarta)..." className={`w-full px-4 py-3 pl-10 rounded-lg border outline-none transition-all placeholder:text-slate-400 ${schoolError ? 'border-orange-300 focus:border-orange-500' : 'border-slate-300 focus:border-blue-500'}`} />
               <div className="absolute top-1/2 left-3 -translate-y-1/2 text-slate-400">{isLoading ? <Loader2 size={18} className="animate-spin text-blue-500"/> : <School size={18} />}</div>
               
-              {/* DROPDOWN SARAN SEKOLAH */}
               {showSuggestions && suggestions.length > 0 && (
                 <ul className="absolute z-50 w-full bg-white border border-slate-200 rounded-lg mt-1 shadow-xl max-h-60 overflow-y-auto">
                   {suggestions.map((item, index) => (

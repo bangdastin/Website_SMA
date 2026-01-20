@@ -2,11 +2,37 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { 
   Home, Megaphone, UserPlus, LogOut, Bell, User, CheckCircle2, ChevronRight, 
   Printer, FileBadge, AlertTriangle, MapPin, Calendar, QrCode, XCircle, RefreshCw,
-  CreditCard, Upload, MessageCircle 
+  CreditCard, Upload, MessageCircle, Lock, ShieldCheck
 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom'; 
 
-import RegistrationForm from './RegistrationForm'; 
-import UploadPayment from './UploadPayment'; 
+import RegistrationForm from '../components/RegistrationForm'; 
+import UploadPayment from '../components/UploadPayment'; 
+
+// --- KOMPONEN BARU: SUCCESS MODAL (PENGGANTI ALERT) ---
+const SuccessModal = ({ isOpen, onClose }) => {
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in">
+      <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-sm w-full text-center transform transition-all scale-100">
+        <div className="w-20 h-20 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto mb-6 ring-8 ring-green-50">
+          <ShieldCheck size={40} />
+        </div>
+        <h3 className="text-2xl font-bold text-slate-800 mb-2">Upload Berhasil!</h3>
+        <p className="text-slate-500 mb-8 leading-relaxed">
+          Bukti pembayaran Anda telah kami terima. Mohon tunggu verifikasi dari admin 1x24 jam.
+        </p>
+        <button 
+          onClick={onClose}
+          className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-xl shadow-lg shadow-blue-200 transition-all active:scale-95"
+        >
+          OK, Kembali ke Dashboard
+        </button>
+      </div>
+    </div>
+  );
+};
 
 // --- 1. SIDEBAR COMPONENT ---
 const Sidebar = ({ isOpen, activeMenu, onMenuClick, onLogout }) => {
@@ -73,7 +99,7 @@ const ExamCardView = ({ userData }) => {
                         <div>
                             <div className="mb-2"><p className="text-[10px] text-slate-500 uppercase font-bold tracking-wider">Nama Peserta</p><p className="text-lg font-bold text-slate-800 leading-tight uppercase truncate">{userData.nama}</p></div>
                             <div className="mb-2"><p className="text-[10px] text-slate-500 uppercase font-bold tracking-wider">No. Ujian</p><p className="text-base font-mono font-bold text-blue-600 tracking-wide">{userData.noUjian}</p></div>
-                            <div className="flex justify-between items-end"><div><p className="text-[10px] text-slate-500 uppercase font-bold tracking-wider">Lokasi</p><p className="text-xs font-bold text-slate-700">{userData.lokasi}</p></div><div className="text-slate-800"><QrCode size={40} /></div></div>
+                            <div className="flex justify-between items-end"><div><p className="text-[10px] text-slate-500 uppercase font-bold tracking-wider">Lokasi</p><p className="text-xs font-bold text-slate-700">{userData.lokasi || 'Lab Komputer 1'}</p></div><div className="text-slate-800"><QrCode size={40} /></div></div>
                         </div>
                         <div className="w-full h-1.5 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-full mt-auto"></div>
                     </div>
@@ -86,9 +112,10 @@ const ExamCardView = ({ userData }) => {
 // --- 3. DASHBOARD CONTENT (HOME) ---
 const DashboardContent = ({ onRegisterClick, onUploadClick, userData, onRefresh }) => {
   const getStatusColor = (status) => {
-    if (status === 'Diterima') return 'bg-green-100 text-green-700 border-green-200';
-    if (status === 'Ditolak') return 'bg-red-100 text-red-700 border-red-200';
-    return 'bg-yellow-100 text-yellow-700 border-yellow-200';
+    if (status === 'Diterima') return 'bg-green-50 border-green-200';
+    if (status === 'Ditolak') return 'bg-red-50 border-red-200';
+    if (status === 'Menunggu') return 'bg-blue-50 border-blue-200';
+    return 'bg-white border-slate-200';
   };
 
   const getProgressWidth = () => {
@@ -115,81 +142,57 @@ const DashboardContent = ({ onRegisterClick, onUploadClick, userData, onRefresh 
           <div className="absolute top-1/2 left-0 w-full h-1 bg-slate-100 -z-10 -translate-y-1/2 rounded-full"></div>
           <div className={`absolute top-1/2 left-0 h-1 bg-blue-500 -z-10 -translate-y-1/2 rounded-full transition-all duration-1000 ${getProgressWidth()}`}></div>
 
-          {/* STEP 1: AKUN */}
-          <div className="flex flex-col items-center gap-2">
-            <div className="w-8 h-8 md:w-10 md:h-10 bg-blue-600 rounded-full flex items-center justify-center text-white shadow-lg"><CheckCircle2 size={18} /></div>
-            <p className="text-xs md:text-sm font-semibold text-blue-700">Akun</p>
-          </div>
-
-          {/* STEP 2: FORMULIR */}
-          <div className="flex flex-col items-center gap-2">
-            <div className={`w-8 h-8 md:w-10 md:h-10 rounded-full flex items-center justify-center z-10 ${userData.status ? 'bg-blue-600 text-white' : 'bg-white border-4 border-blue-600 text-blue-600'}`}>
-              {userData.status ? <CheckCircle2 size={18}/> : <span className="text-sm font-bold">2</span>}
-            </div>
-            <p className="text-xs md:text-sm font-bold text-slate-800">Formulir</p>
-          </div>
-
-          {/* STEP 3: PEMBAYARAN */}
-          <div className="flex flex-col items-center gap-2">
-             <div className={`w-8 h-8 md:w-10 md:h-10 rounded-full flex items-center justify-center z-10 border-4 ${userData.buktiBayar ? 'bg-blue-600 border-blue-600 text-white' : userData.status ? 'bg-white border-blue-600 text-blue-600' : 'bg-white border-slate-200 text-slate-400'}`}>
-               {userData.buktiBayar ? <CheckCircle2 size={18}/> : <span className="text-sm font-bold">3</span>}
-            </div>
-            <p className="text-xs md:text-sm font-medium text-slate-600">Bayar</p>
-          </div>
-
-          {/* STEP 4: VERIFIKASI */}
-          <div className="flex flex-col items-center gap-2">
-             <div className={`w-8 h-8 md:w-10 md:h-10 rounded-full flex items-center justify-center z-10 border-4 ${userData.status === 'Diterima' ? 'bg-blue-600 border-blue-600 text-white' : userData.status === 'Ditolak' ? 'bg-red-500 text-white border-red-500' : 'bg-white border-slate-200 text-slate-400'}`}>
-               {userData.status === 'Diterima' ? <CheckCircle2 size={18}/> : userData.status === 'Ditolak' ? <XCircle size={18}/> : <span className="text-sm font-bold">4</span>}
-            </div>
-            <p className="text-xs md:text-sm font-medium text-slate-400">Verifikasi</p>
-          </div>
-
-          {/* STEP 5: KARTU */}
-          <div className="flex flex-col items-center gap-2">
-             <div className={`w-8 h-8 md:w-10 md:h-10 rounded-full flex items-center justify-center z-10 border-4 ${userData.status === 'Diterima' ? 'bg-blue-600 border-blue-600 text-white' : 'bg-white border-slate-200 text-slate-400'}`}>
-               {userData.status === 'Diterima' ? <FileBadge size={18}/> : <span className="text-sm font-bold">5</span>}
-            </div>
-            <p className="text-xs md:text-sm font-medium text-slate-400">Kartu</p>
-          </div>
+          {['Akun', 'Formulir', 'Bayar', 'Verifikasi', 'Kartu'].map((step, idx) => (
+              <div key={idx} className="flex flex-col items-center gap-2">
+                  <div className={`w-8 h-8 md:w-10 md:h-10 rounded-full flex items-center justify-center z-10 transition-colors ${
+                      idx === 0 || userData.status ? 'bg-blue-600 text-white' : 'bg-white border-4 border-slate-200 text-slate-400'
+                  }`}>
+                      <CheckCircle2 size={18}/>
+                  </div>
+                  <p className="text-xs md:text-sm font-semibold text-slate-600">{step}</p>
+              </div>
+          ))}
         </div>
       </div>
 
       {/* ALERT BOX STATUS */}
       <div className={`border rounded-xl p-6 flex items-start gap-4 mb-8 transition-colors duration-500 ${getStatusColor(userData.status)}`}>
-          <div className="p-2 rounded-full bg-white/50">
-              {userData.status === 'Ditolak' ? <XCircle size={24} /> : <Megaphone size={24} />}
+          <div className="p-2 rounded-full bg-white/60">
+              {userData.status === 'Ditolak' ? <XCircle size={24} className="text-red-500"/> : <Megaphone size={24} className="text-blue-500"/>}
           </div>
           <div>
-              <h4 className="font-bold mb-1">Halo, {userData.nama}!</h4>
+              <h4 className="font-bold mb-1 text-slate-800">Halo, {userData.nama}!</h4>
               
               {!userData.status && (
-                  <p className="text-sm">Anda belum melakukan pendaftaran. Silakan klik tombol di bawah untuk mengisi formulir.</p>
+                  <p className="text-sm text-slate-600">Anda belum melakukan pendaftaran. Silakan klik tombol di bawah untuk mengisi formulir.</p>
               )}
 
               {userData.status === 'Menunggu' && !userData.buktiBayar && (
                   <div>
                     <p className="text-sm font-bold mb-1 text-orange-700">Langkah Selanjutnya: Upload Bukti Pembayaran.</p>
-                    <p className="text-sm">Data formulir Anda sudah tersimpan. Silakan transfer biaya pendaftaran, lalu upload buktinya agar kami bisa memverifikasi.</p>
+                    <p className="text-sm text-slate-600">Data formulir Anda sudah tersimpan. Silakan transfer biaya pendaftaran, lalu upload buktinya agar kami bisa memverifikasi.</p>
                   </div>
               )}
 
               {userData.status === 'Menunggu' && userData.buktiBayar && (
                   <div>
                     <p className="text-sm font-bold mb-1 text-blue-700">Terima Kasih, Bukti Pembayaran Diterima.</p>
-                    <p className="text-sm">
-                        Saat ini panitia sedang memverifikasi data dan pembayaran Anda. 
-                        <strong> Silakan Hubungi Panitia via WhatsApp untuk mempercepat proses (Akseptasi).</strong>
+                    <p className="text-sm text-slate-600">
+                        Saat ini panitia sedang memverifikasi data dan pembayaran Anda. <br/>
+                        Mohon tunggu 1x24 jam atau hubungi admin jika mendesak.
                     </p>
                   </div>
               )}
 
               {userData.status === 'Diterima' && (
-                  <p className="text-sm">Selamat! Pendaftaran Anda <strong>DITERIMA</strong>. Silakan unduh Kartu Ujian Anda pada menu di samping.</p>
+                  <p className="text-sm text-green-700">Selamat! Pendaftaran Anda <strong>DITERIMA</strong>. Silakan unduh Kartu Ujian Anda pada menu di samping.</p>
               )}
 
               {userData.status === 'Ditolak' && (
-                  <p className="text-sm">Mohon maaf, pendaftaran Anda <strong>DITOLAK</strong>. Silakan hubungi panitia untuk informasi lebih lanjut.</p>
+                  <div>
+                      <p className="text-sm font-bold text-red-700 mb-1">Mohon Maaf, Pendaftaran Ditolak.</p>
+                      <p className="text-sm text-red-600">Silakan perbaiki data atau upload ulang bukti pembayaran yang valid melalui menu <strong>Pembayaran</strong>.</p>
+                  </div>
               )}
           </div>
       </div>
@@ -197,7 +200,7 @@ const DashboardContent = ({ onRegisterClick, onUploadClick, userData, onRefresh 
       {/* CALL TO ACTION BUTTONS */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {/* Tombol Daftar */}
-        {!userData.status && (
+        {(!userData.status || userData.status === 'Belum') && (
             <div onClick={onRegisterClick} className="bg-gradient-to-r from-blue-600 to-indigo-600 rounded-2xl p-6 text-white shadow-xl cursor-pointer hover:scale-[1.02] transition-transform">
                 <h2 className="text-2xl font-bold mb-2">1. Isi Formulir</h2>
                 <p className="text-blue-100 mb-4">Lengkapi biodata diri.</p>
@@ -206,15 +209,15 @@ const DashboardContent = ({ onRegisterClick, onUploadClick, userData, onRefresh 
         )}
 
         {/* Tombol Upload */}
-        {userData.status === 'Menunggu' && !userData.buktiBayar && (
-            <div onClick={onUploadClick} className="bg-gradient-to-r from-orange-500 to-red-500 rounded-2xl p-6 text-white shadow-xl cursor-pointer hover:scale-[1.02] transition-transform">
-                <h2 className="text-2xl font-bold mb-2">2. Upload Bukti</h2>
-                <p className="text-orange-100 mb-4">Kirim foto bukti transfer.</p>
-                <button className="bg-white text-orange-600 font-bold py-2 px-4 rounded-lg flex items-center gap-2"><Upload size={18} /> Upload Sekarang</button>
+        {((userData.status === 'Menunggu' && !userData.buktiBayar) || userData.status === 'Ditolak') && (
+            <div onClick={onUploadClick} className={`rounded-2xl p-6 text-white shadow-xl cursor-pointer hover:scale-[1.02] transition-transform ${userData.status === 'Ditolak' ? 'bg-gradient-to-r from-red-500 to-pink-600' : 'bg-gradient-to-r from-orange-500 to-red-500'}`}>
+                <h2 className="text-2xl font-bold mb-2">{userData.status === 'Ditolak' ? 'Upload Ulang' : '2. Upload Bukti'}</h2>
+                <p className="text-white/90 mb-4">{userData.status === 'Ditolak' ? 'Perbaiki bukti pembayaran.' : 'Kirim foto bukti transfer.'}</p>
+                <button className="bg-white text-orange-600 font-bold py-2 px-4 rounded-lg flex items-center gap-2"><Upload size={18} /> {userData.status === 'Ditolak' ? 'Perbaiki Sekarang' : 'Upload Sekarang'}</button>
             </div>
         )}
 
-        {/* Tombol Chat Panitia (Muncul jika sudah upload) */}
+        {/* Tombol Chat Panitia */}
         {userData.status === 'Menunggu' && userData.buktiBayar && (
              <div onClick={() => window.open('https://wa.me/6281234567890?text=Halo+Panitia,+saya+sudah+upload+bukti+bayar.+Mohon+dicek.', '_blank')} className="bg-gradient-to-r from-green-500 to-emerald-600 rounded-2xl p-6 text-white shadow-xl cursor-pointer hover:scale-[1.02] transition-transform md:col-span-2">
                 <h2 className="text-2xl font-bold mb-2">3. Konfirmasi Panitia</h2>
@@ -228,97 +231,83 @@ const DashboardContent = ({ onRegisterClick, onUploadClick, userData, onRefresh 
 };
 
 // --- 4. MAIN COMPONENT (USER DASHBOARD) ---
-const UserDashboard = ({ user }) => {
+const UserDashboard = () => {
+  const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [currentView, setCurrentView] = useState('home');
+  const [showSuccessModal, setShowSuccessModal] = useState(false); // STATE UNTUK MODAL
   
-  // STATE USER DATA
   const [userData, setUserData] = useState({
-    nama: user?.username || "Siswa",
-    email: user?.email || "", 
+    id: null,
+    nama: "Siswa",
+    email: "", 
     status: null, 
     asalSekolah: "-", 
     buktiBayar: null, 
     noUjian: "-"
   });
 
-  // --- FETCH DATA USER DARI API ---
   const fetchUserStatus = useCallback(async () => {
-    if (!user?.email) return;
+    const storedUser = JSON.parse(localStorage.getItem('userApp'));
+    if (!storedUser || !storedUser.id) { navigate('/auth'); return; }
 
-    // Definisikan URL Vercel
-    const VERCEL_BACKEND_URL = "https://website-sma-y1ls-4vy3hvenx-bangdastins-projects.vercel.app";
-    
-    // Logika Otomatis: Jika di localhost, pakai localhost. Jika di Vercel, pakai URL Vercel/Kosong.
-    const API_BASE_URL = window.location.hostname === 'localhost' 
-        ? VERCEL_BACKEND_URL // Di laptop pun kita tembak ke Vercel biar tidak error
-        : ""; 
+    const LOCAL_URL = "http://localhost:5000";
+    const PROD_URL = "https://website-sma-y1ls-4vy3hvenx-bangdastins-projects.vercel.app";
+    const API_BASE_URL = window.location.hostname === 'localhost' ? LOCAL_URL : PROD_URL; 
 
     try {
-        // --- KODE LAMA (DICOMMENT SESUAI REQUEST) ---
-        // const response = await fetch(`http://10.5.46.195:5000/api/user-status?email=${user.email}`);
-        
-        // --- KODE BARU (MENGGUNAKAN URL VERCEL) ---
-        // Kita gunakan API_BASE_URL agar aman, atau langsung VERCEL_BACKEND_URL
-        const response = await fetch(`${VERCEL_BACKEND_URL}/api/user-status?email=${user.email}`);
-        
-        const data = await response.json();
-
-        if (data.registered) {
-            setUserData(prev => ({
-                ...prev,
-                nama: data.nama,               
-                email: data.email || user.email, 
-                status: data.status,           
-                asalSekolah: data.asalSekolah, 
-                noUjian: data.noUjian,
-                buktiBayar: data.bukti_pembayaran || null 
-            }));
-        } else {
-            setUserData(prev => ({ 
-                ...prev, 
-                nama: user.username, 
-                email: user.email,
-                status: null,
-                asalSekolah: "-",
-                buktiBayar: null
-            }));
+        const response = await fetch(`${API_BASE_URL}/api/users/${storedUser.id}`);
+        if (response.ok) {
+            const freshData = await response.json();
+            setUserData({
+                id: freshData.id,
+                nama: freshData.nama_lengkap || freshData.username,
+                email: freshData.email,
+                status: freshData.status_pendaftaran, 
+                asalSekolah: freshData.asal_sekolah || "-",
+                noUjian: freshData.no_ujian || "-",
+                buktiBayar: freshData.bukti_pembayaran || null
+            });
+            localStorage.setItem('userApp', JSON.stringify({ ...storedUser, ...freshData }));
+        } else if (response.status === 404) {
+            localStorage.removeItem('userApp');
+            navigate('/auth');
         }
-    } catch (error) {
-        console.error("Gagal ambil status:", error);
-    }
-  }, [user]);
+    } catch (error) { console.error("Gagal koneksi:", error); }
+  }, [navigate]);
 
-  // --- AUTO REFRESH ---
-  useEffect(() => {
-    fetchUserStatus(); 
-    const intervalId = setInterval(() => {
-        fetchUserStatus(); 
-    }, 5000);
-    return () => clearInterval(intervalId);
-  }, [fetchUserStatus]);
+  useEffect(() => { fetchUserStatus(); }, [fetchUserStatus]);
 
-  // --- HANDLERS ---
   const handleDataRefreshOnly = () => {
     fetchUserStatus(); 
   };
-  
+
   const handleUploadSuccess = () => {
-      fetchUserStatus();
-      // Tetap di halaman upload untuk melihat pesan "Sedang Diverifikasi"
-      // Atau pindah ke home, tergantung selera Anda. 
-      // setCurrentView('home'); 
-  }
+      // TAMPILKAN MODAL SAAT UPLOAD SUKSES
+      setShowSuccessModal(true); 
+  };
+
+  const handleModalClose = () => {
+      // SAAT MODAL DITUTUP, REFRESH DAN KE HOME
+      setShowSuccessModal(false);
+      fetchUserStatus().then(() => {
+          setCurrentView('home'); 
+      });
+  };
 
   const handleBackToHome = () => {
     fetchUserStatus(); 
     setCurrentView('home');
   };
 
-  const handleLogout = () => { window.location.reload(); };
+  const handleLogout = () => { localStorage.removeItem('userApp'); navigate('/'); };
 
   return (
     <div className="min-h-screen bg-slate-50 font-sans flex text-slate-800">
+      
+      {/* RENDER MODAL DISINI */}
+      <SuccessModal isOpen={showSuccessModal} onClose={handleModalClose} />
+
       <Sidebar isOpen={sidebarOpen} activeMenu={currentView} onMenuClick={setCurrentView} onLogout={handleLogout} />
       <main className={`flex-1 flex flex-col transition-all duration-300 ${sidebarOpen ? 'md:ml-64' : 'md:ml-20'}`}>
         <header className="bg-white h-20 px-8 flex items-center justify-between sticky top-0 z-40 border-b border-slate-100/50 backdrop-blur-sm bg-white/80 print:hidden">
@@ -337,31 +326,61 @@ const UserDashboard = ({ user }) => {
         
         {currentView === 'pendaftaran' && (
           <div className="animate-fade-in print:hidden">
-            <RegistrationForm 
-                onSuccess={() => { handleDataRefreshOnly(); setCurrentView('upload'); }} 
-                onGoHome={handleBackToHome}
-                userData={userData} 
-            />
+            {userData.status && userData.status !== 'Belum' ? (
+                <div className="flex flex-col items-center justify-center h-[60vh] text-center p-8 bg-white m-8 rounded-2xl shadow-sm border border-slate-100">
+                    <div className={`w-20 h-20 rounded-full flex items-center justify-center mb-6 ${userData.status === 'Ditolak' ? 'bg-red-100 text-red-500' : 'bg-yellow-100 text-yellow-600'}`}>
+                        {userData.status === 'Ditolak' ? <XCircle size={40} /> : <Lock size={40} />}
+                    </div>
+                    <h2 className="text-2xl font-bold text-slate-800 mb-2">
+                        {userData.status === 'Ditolak' ? 'Pendaftaran Ditolak' : 'Anda Sudah Terdaftar'}
+                    </h2>
+                    <p className="text-slate-500 max-w-md mb-6">
+                        {userData.status === 'Ditolak' 
+                            ? 'Mohon maaf, formulir Anda ditolak. Silakan cek menu Upload untuk memperbaiki data jika diminta.' 
+                            : 'Data Anda sedang dalam proses verifikasi. Tidak perlu mengisi formulir lagi.'}
+                    </p>
+                    <div className="inline-flex px-4 py-2 bg-slate-100 rounded-lg text-slate-600 font-medium text-sm">
+                        Status: <span className={`ml-1 font-bold ${userData.status === 'Ditolak' ? 'text-red-600' : 'text-blue-600'}`}>{userData.status}</span>
+                    </div>
+                    <button onClick={() => setCurrentView('home')} className="mt-8 bg-blue-600 text-white px-6 py-2.5 rounded-xl hover:bg-blue-700 transition-colors">
+                        Kembali ke Dashboard
+                    </button>
+                </div>
+            ) : (
+                <RegistrationForm 
+                    onSuccess={() => { handleDataRefreshOnly(); setCurrentView('upload'); }} 
+                    onGoHome={handleBackToHome}
+                    userData={userData} 
+                />
+            )}
           </div>
         )}
 
-        {/* --- PEMBAYARAN VIEW (Sudah Terintegrasi) --- */}
         {currentView === 'upload' && (
           <div className="p-8 max-w-2xl mx-auto animate-fade-in print:hidden">
               <button onClick={handleBackToHome} className="mb-4 text-slate-500 hover:text-blue-600 flex items-center gap-2">
                   <ChevronRight className="rotate-180" size={20}/> Kembali
               </button>
               
-              {/* PERBAIKAN DISINI: Tambahkan prop 'buktiBayar' */}
-              <UploadPayment 
-                  userEmail={userData.email} 
-                  currentStatus={userData.status} 
-                  buktiBayar={userData.buktiBayar}  // <--- TAMBAHAN PENTING
-                  onUploadSuccess={handleUploadSuccess} 
-              />
+              {userData.status === 'Menunggu' && userData.buktiBayar ? (
+                  <div className="bg-green-50 border border-green-200 rounded-xl p-8 text-center">
+                      <div className="w-16 h-16 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                          <CheckCircle2 size={32}/>
+                      </div>
+                      <h3 className="text-xl font-bold text-green-800 mb-2">Bukti Terkirim!</h3>
+                      <p className="text-green-700">Terima kasih. Bukti pembayaran Anda sedang kami verifikasi.</p>
+                      <button onClick={() => setCurrentView('home')} className="mt-6 bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700">Kembali ke Home</button>
+                  </div>
+              ) : (
+                  <UploadPayment 
+                      userId={userData.id}  
+                      existingImage={userData.buktiBayar} 
+                      currentStatus={userData.status}
+                      onUploadSuccess={handleUploadSuccess} 
+                  />
+              )}
           </div>
-      )}
-        {/* ----------------------------- */}
+        )}
 
         {currentView === 'kartu' && <ExamCardView userData={userData} />}
       </main>

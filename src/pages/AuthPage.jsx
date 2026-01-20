@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom'; // PENTING: Import ini untuk pindah halaman
 import { Mail, Lock, User, Hash, Eye, EyeOff, ArrowLeft, CheckCircle2, AlertCircle, Loader2, KeyRound } from 'lucide-react';
 
 // --- CSS ANIMASI ---
@@ -15,21 +16,19 @@ const customStyles = `
   .animate-fade-in { animation: fadeIn 0.3s ease-out forwards; }
 `;
 
-const AuthPage = ({ onLoginSuccess, onBackToHome, initialView = 'login', resetToken = null }) => {
+const AuthPage = ({ initialView = 'login', resetToken = null }) => {
+  // PENTING: Inisialisasi navigasi
+  const navigate = useNavigate();
+
+  // =================================================================
+  // KONFIGURASI URL BACKEND
+  // =================================================================
+  const LOCAL_URL = "http://localhost:5000";
+  const PROD_URL = "https://website-sma-y1ls-4vy3hvenx-bangdastins-projects.vercel.app";
   
-  // =================================================================
-  // 1. KONFIGURASI URL BACKEND (OTOMATIS)
-  // =================================================================
-  // Link Vercel Anda
-  const VERCEL_BACKEND_URL = "https://website-sma-y1ls-4vy3hvenx-bangdastins-projects.vercel.app";
-
-  // Logika: 
-  // - Jika buka di Localhost, tembak ke Vercel (atau localhost jika backend nyala).
-  // - Jika buka di Vercel, gunakan path kosong (relative).
   const API_BASE_URL = window.location.hostname === 'localhost' 
-    ? VERCEL_BACKEND_URL 
-    : ""; 
-
+    ? LOCAL_URL 
+    : PROD_URL; 
   // =================================================================
 
   const [view, setView] = useState(initialView); 
@@ -46,12 +45,12 @@ const AuthPage = ({ onLoginSuccess, onBackToHome, initialView = 'login', resetTo
   const [forgotEmail, setForgotEmail] = useState('');
   const [resetData, setResetData] = useState({ newPassword: '', confirmNewPassword: '' });
 
-  // 1. Effect hanya untuk mendeteksi Token saat pertama kali load (Mount)
+  // Effect token
   useEffect(() => {
     if (resetToken) setView('reset');
   }, [resetToken]);
 
-  // 2. Effect untuk membersihkan pesan error saat view berubah
+  // Bersihkan pesan error saat ganti view
   useEffect(() => {
     setMessage({ type: '', text: '' });
   }, [view]);
@@ -60,8 +59,8 @@ const AuthPage = ({ onLoginSuccess, onBackToHome, initialView = 'login', resetTo
     setSuccessModal({ show: true, text: text });
     setTimeout(() => {
         setSuccessModal({ show: false, text: '' });
-        if (callback) callback(); // Ini yang akan menjalankan pindah halaman
-    }, 2000); // Durasi animasi 2 detik
+        if (callback) callback(); 
+    }, 2000); 
   };
 
   const validatePasswordStrength = (password) => {
@@ -71,12 +70,14 @@ const AuthPage = ({ onLoginSuccess, onBackToHome, initialView = 'login', resetTo
     return null;
   };
 
-  // --- HANDLER LOGIN (DIPERBAIKI UNTUK ADMIN) ---
+  // --- HANDLER LOGIN (FIX NAVIGASI) ---
   const handleLogin = async (e) => {
     e.preventDefault();
     setIsLoading(true); setMessage({ type: '', text: '' });
 
     try {
+      console.log("Login ke:", `${API_BASE_URL}/api/auth/login`);
+      
       const res = await fetch(`${API_BASE_URL}/api/auth/login`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, 
         body: JSON.stringify(loginData)
@@ -84,25 +85,22 @@ const AuthPage = ({ onLoginSuccess, onBackToHome, initialView = 'login', resetTo
       const data = await res.json();
 
       if (res.ok) {
-        // Simpan data user (termasuk role) ke LocalStorage
         localStorage.setItem('userApp', JSON.stringify(data.user));
-        
         showSuccessAnimation("Login Berhasil!", () => {
-            // --- LOGIKA PENGECEKAN ROLE ---
+            // Logika Redirect
             if (data.user.role === 'admin') {
-                // Jika Role adalah Admin, arahkan paksa ke /admin
-                window.location.href = "/admin";
+                window.location.href = "/admin"; 
             } else {
-                // Jika Role User biasa, jalankan fungsi normal
-                onLoginSuccess(data.user);
+                // PERBAIKAN UTAMA: Gunakan navigate
+                navigate('/dashboard'); 
             }
         });
       } else {
         setMessage({ type: 'error', text: data.message });
       }
     } catch (err) { 
-        console.error(err);
-        setMessage({ type: 'error', text: 'Gagal terhubung ke server.' }); 
+        console.error("Login Error:", err);
+        setMessage({ type: 'error', text: 'Gagal terhubung ke server. Pastikan backend nyala.' }); 
     } 
     finally { setIsLoading(false); }
   };
@@ -165,9 +163,7 @@ const AuthPage = ({ onLoginSuccess, onBackToHome, initialView = 'login', resetTo
       const data = await res.json();
 
       if (res.ok) { 
-          // Bersihkan Token dari URL Browser
           window.history.replaceState({}, document.title, "/");
-          
           showSuccessAnimation("Password Berhasil Diubah!", () => {
              setView('login'); 
           });
@@ -201,7 +197,8 @@ const AuthPage = ({ onLoginSuccess, onBackToHome, initialView = 'login', resetTo
       {/* --- CARD UTAMA --- */}
       <div className={`bg-white w-full max-w-md p-8 rounded-2xl shadow-xl border border-slate-100 relative animate-fade-in transition-all duration-500 ${successModal.show ? 'opacity-0 scale-95' : 'opacity-100 scale-100'}`}>
         
-        <button onClick={onBackToHome} className="absolute top-6 left-6 text-slate-400 hover:text-blue-600 transition-colors p-2 hover:bg-slate-50 rounded-full">
+        {/* Tombol Kembali: Menggunakan navigate('/') */}
+        <button onClick={() => navigate('/')} className="absolute top-6 left-6 text-slate-400 hover:text-blue-600 transition-colors p-2 hover:bg-slate-50 rounded-full">
             <ArrowLeft size={24} />
         </button>
         
@@ -340,3 +337,4 @@ const AuthPage = ({ onLoginSuccess, onBackToHome, initialView = 'login', resetTo
 };
 
 export default AuthPage;
+
