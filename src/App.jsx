@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react'; // Tambahkan useEffect
 import { Routes, Route, Navigate } from 'react-router-dom';
 
 // --- IMPORT KOMPONEN UI ---
@@ -19,6 +19,10 @@ import VisiMisi from './components/VisiMisi';
 import Struktur from './components/Struktur';
 import Prestasi from './components/Prestasi';
 import Pengumuman from './components/Pengumuman';
+
+// --- IMPORT LOGO UNTUK TAB BROWSER ---
+// Ganti 'logo-sekolah.png' sesuai nama file logo asli Anda di folder src/assets
+import faviconLogo from './assets/logo sekolah.jpeg'; 
 
 // =================================================================
 // 1. LAYOUT PUBLIK (Navbar + Footer)
@@ -60,6 +64,26 @@ const AuthPageWrapper = () => {
 };
 
 function App() {
+
+  // =================================================================
+  // LOGIKA GANTI ICON TAB & JUDUL WEB
+  // =================================================================
+  useEffect(() => {
+    // 1. Ganti Judul Tab
+    document.title = "SMA Negeri 2 Lintongnihuta";
+
+    // 2. Ganti Icon (Favicon)
+    let link = document.querySelector("link[rel~='icon']");
+    if (!link) {
+      link = document.createElement('link');
+      link.rel = 'icon';
+      document.getElementsByTagName('head')[0].appendChild(link);
+    }
+    // Set gambar icon ke file yang kita import dari assets
+    link.href = faviconLogo;
+  }, []);
+
+
   return (
     <Routes>
       

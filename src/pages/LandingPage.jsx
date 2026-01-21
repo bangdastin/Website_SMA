@@ -196,7 +196,7 @@ const LandingPage = () => {
                       className="w-full h-full object-cover transform group-hover:scale-110 transition-transform duration-700"
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end p-4">
-                      <p className="text-white font-medium text-sm">Kegiatan Belajar Mengajar</p>
+                      <p className="text-white font-medium text-sm">Prestasi Siswa</p>
                     </div>
                   </div>
                 </div>
@@ -220,11 +220,11 @@ const LandingPage = () => {
                    <div className="group relative overflow-hidden rounded-2xl shadow-lg aspect-[4/3]">
                     <img 
                       src={siswa3} 
-                      alt="Praktikum Laboratorium" 
+                      alt="Pengukuhan" 
                       className="w-full h-full object-cover transform group-hover:scale-110 transition-transform duration-700"
                     />
                      <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end p-4">
-                      <p className="text-white font-medium text-sm">Fasilitas Laboratorium</p>
+                      <p className="text-white font-medium text-sm">Pengukuhan</p>
                     </div>
                   </div>
                 </div>
@@ -234,11 +234,11 @@ const LandingPage = () => {
                    <div className="group relative overflow-hidden rounded-2xl shadow-lg aspect-[4/3]">
                     <img 
                       src={siswa4} 
-                      alt="Prestasi Siswa" 
+                      alt="Pengukuhan" 
                       className="w-full h-full object-cover transform group-hover:scale-110 transition-transform duration-700"
                     />
                      <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end p-4">
-                      <p className="text-white font-medium text-sm">Prestasi Siswa</p>
+                      <p className="text-white font-medium text-sm">Pengukuhan</p>
                     </div>
                   </div>
                 </div>
