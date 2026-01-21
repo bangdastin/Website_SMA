@@ -155,7 +155,7 @@ const PengumumanManager = ({ showAlert }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [editId, setEditId] = useState(null);
   const [formData, setFormData] = useState({ judul: '', isi: '', tanggal: '' });
-  const [pdfFile, setPdfFile] = useState(null); 
+  const [pdfFiles, setPdfFiles] = useState([]); 
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const fetchData = async () => {
@@ -170,21 +170,32 @@ const PengumumanManager = ({ showAlert }) => {
 
   const handleEdit = (item) => {
     setFormData({ judul: item.judul, isi: item.isi, tanggal: item.tanggal.split('T')[0] });
-    setEditId(item.id); setIsEditing(true); setShowForm(true); setPdfFile(null); 
+    setEditId(item.id); setIsEditing(true); setShowForm(true); setPdfFiles([]); 
   };
 
   const resetForm = () => {
     setFormData({ judul: '', isi: '', tanggal: '' });
-    setPdfFile(null); setIsEditing(false); setEditId(null); setShowForm(false);
+    setPdfFiles([]); setIsEditing(false); setEditId(null); setShowForm(false);
   };
 
   const handleFileChange = (e) => {
-    const file = e.target.files[0];
-    if (file && file.size > 2 * 1024 * 1024) {
-        showAlert('error', 'File Terlalu Besar', 'Maksimal ukuran file PDF adalah 2MB.');
-        e.target.value = null; setPdfFile(null); return;
+    const files = Array.from(e.target.files);
+    const validFiles = [];
+    let hasError = false;
+
+    for (let file of files) {
+      if (file.size > 2 * 1024 * 1024) { 
+         showAlert('error', 'File Terlalu Besar', `File ${file.name} melebihi 2MB.`);
+         hasError = true;
+         continue; 
+      }
+      validFiles.push(file);
     }
-    if (file) setPdfFile(file);
+
+    if (hasError) {
+        e.target.value = null; 
+    } 
+    setPdfFiles(validFiles);
   };
 
   const handleSubmit = async (e) => {
@@ -192,7 +203,12 @@ const PengumumanManager = ({ showAlert }) => {
     setIsSubmitting(true);
     const data = new FormData();
     data.append('judul', formData.judul); data.append('isi', formData.isi); data.append('tanggal', formData.tanggal);
-    if (pdfFile) data.append('file_pdf', pdfFile);
+    
+    if (pdfFiles.length > 0) {
+        pdfFiles.forEach(file => {
+            data.append('files_pdf', file);
+        });
+    }
 
     try {
       let url = isEditing ? `${API_BASE_URL}/api/pengumuman/${editId}` : `${API_BASE_URL}/api/pengumuman`;
@@ -215,6 +231,19 @@ const PengumumanManager = ({ showAlert }) => {
     });
   };
 
+  // --- PERBAIKAN DISINI (FIX ERROR NULL) ---
+  const parseFiles = (fileString) => {
+      if (!fileString) return []; // Jika null/kosong, kembalikan array kosong
+      try {
+          const parsed = JSON.parse(fileString);
+          // Pastikan hasil parse adalah array, jika bukan (misal null), return []
+          return Array.isArray(parsed) ? parsed : [];
+      } catch (e) {
+          // Fallback untuk format lama (single string)
+          return fileString ? [fileString] : [];
+      }
+  };
+
   return (
     <div className="bg-white rounded-xl border border-slate-100 shadow-sm p-6">
       <div className="flex justify-between items-center mb-6">
@@ -231,9 +260,17 @@ const PengumumanManager = ({ showAlert }) => {
                <input required type="date" className="p-2 border rounded-lg" value={formData.tanggal} onChange={e=>setFormData({...formData, tanggal: e.target.value})} />
             </div>
             <div className="w-full">
-                <label className="block text-sm font-medium text-slate-700 mb-1">Upload File PDF (Opsional)</label>
-                <input type="file" accept="application/pdf" onChange={handleFileChange} className="w-full p-2 border rounded-lg bg-white text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100" />
-                <p className="text-xs text-slate-400 mt-1 flex items-center gap-1"><AlertTriangle size={12}/> Maks 2MB. Format .pdf</p>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Upload File PDF (Bisa Banyak, Opsional)</label>
+                <input type="file" multiple accept="application/pdf" onChange={handleFileChange} className="w-full p-2 border rounded-lg bg-white text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100" />
+                <p className="text-xs text-slate-400 mt-1 flex items-center gap-1"><AlertTriangle size={12}/> Maks 2MB per file. Format .pdf</p>
+                {pdfFiles.length > 0 && (
+                    <div className="mt-2 text-sm text-slate-600">
+                        <p className="font-semibold">File terpilih:</p>
+                        <ul className="list-disc list-inside">
+                            {pdfFiles.map((f, i) => <li key={i}>{f.name}</li>)}
+                        </ul>
+                    </div>
+                )}
             </div>
             <textarea required className="p-2 border rounded-lg h-32" value={formData.isi} onChange={e=>setFormData({...formData, isi: e.target.value})} placeholder="Isi pengumuman lengkap..."></textarea>
           </div>
@@ -245,7 +282,9 @@ const PengumumanManager = ({ showAlert }) => {
       )}
       <div className="space-y-4">
         {loading ? <p className="text-center text-slate-400">Memuat data...</p> : dataList.length === 0 ? <p className="text-center text-slate-400">Belum ada pengumuman.</p> : 
-          dataList.map(item => (
+          dataList.map(item => {
+            const files = parseFiles(item.file_pdf); // Sekarang aman dari error null
+            return (
             <div key={item.id} className="p-4 border border-slate-100 rounded-xl bg-slate-50 hover:border-blue-200 transition-colors flex justify-between items-start group">
                 <div className="flex-1 pr-4">
                     <div className="flex items-center gap-2 mb-1">
@@ -253,11 +292,13 @@ const PengumumanManager = ({ showAlert }) => {
                         <span className="bg-blue-100 text-blue-700 text-[10px] px-2 py-0.5 rounded-full font-bold flex items-center gap-1"><Calendar size={10}/> {new Date(item.tanggal).toLocaleDateString('id-ID')}</span>
                     </div>
                     <p className="text-sm text-slate-600 whitespace-pre-wrap">{item.isi}</p>
-                    {item.file_pdf && (
-                        <div className="mt-3">
-                            <a href={`${API_BASE_URL}/uploads/${item.file_pdf}`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 text-sm bg-white border border-slate-200 px-3 py-1.5 rounded-lg text-blue-600 hover:bg-blue-50 transition-colors shadow-sm">
-                                <FileText size={16} className="text-red-500"/><span className="font-medium">Lihat Lampiran PDF</span><Download size={14} className="ml-1 opacity-50"/>
-                            </a>
+                    {files.length > 0 && (
+                        <div className="mt-3 flex flex-wrap gap-2">
+                            {files.map((file, idx) => (
+                                <a key={idx} href={`${API_BASE_URL}/uploads/${file}`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 text-sm bg-white border border-slate-200 px-3 py-1.5 rounded-lg text-blue-600 hover:bg-blue-50 transition-colors shadow-sm">
+                                    <FileText size={16} className="text-red-500"/><span className="font-medium">Lampiran {idx + 1}</span><Download size={14} className="ml-1 opacity-50"/>
+                                </a>
+                            ))}
                         </div>
                     )}
                 </div>
@@ -266,7 +307,8 @@ const PengumumanManager = ({ showAlert }) => {
                     <button onClick={() => handleDelete(item.id)} className="p-2 bg-red-100 text-red-600 hover:bg-red-200 rounded-lg"><Trash2 size={16}/></button>
                 </div>
             </div>
-        ))}
+            );
+          })}
       </div>
     </div>
   );
@@ -513,7 +555,6 @@ const AdminDashboard = () => {
                                 <td className="p-4 font-bold">{item.nama_lengkap || item.username}<div className="text-xs font-normal text-slate-400 flex items-center gap-1"><Phone size={10}/> {item.no_telepon || '-'}</div></td>
                                 <td className="p-4">{item.asal_sekolah || '-'}</td>
                                 
-                                {/* KOLOM VIEW FORMULIR (GANTI DARI BUKTI BAYAR) */}
                                 <td className="p-4 text-center">
                                     <button 
                                         onClick={() => handleViewPDF(item)}

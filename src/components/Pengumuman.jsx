@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
-// Menambahkan FileText dan Download ke import
-import { ArrowRight, Calendar, Bell, X, Clock, FileText, Download } from 'lucide-react';
+import { ArrowRight, Calendar, Bell, X, Clock, FileText, Download, Paperclip } from 'lucide-react';
 
 const Pengumuman = () => {
   const [pengumumanList, setPengumumanList] = useState([]);
@@ -26,7 +25,8 @@ const Pengumuman = () => {
         const response = await fetch(`${API_BASE_URL}/api/pengumuman`);
         if (response.ok) {
           const data = await response.json();
-          setPengumumanList(data.slice(0, 5));
+          // Ambil 6 pengumuman terbaru
+          setPengumumanList(data.slice(0, 6));
         }
       } catch (error) {
         console.error("Gagal mengambil data pengumuman:", error);
@@ -37,6 +37,19 @@ const Pengumuman = () => {
 
     fetchPengumuman();
   }, []);
+
+  // --- HELPER: PARSE FILE PDF (Mendukung Multiple Files & Legacy) ---
+  const parseFiles = (fileString) => {
+    if (!fileString) return []; // Jika kosong/null
+    try {
+      // Coba parse sebagai JSON Array (Format Baru: ["file1.pdf", "file2.pdf"])
+      const parsed = JSON.parse(fileString);
+      return Array.isArray(parsed) ? parsed : [fileString];
+    } catch (e) {
+      // Jika error parse, berarti Format Lama (Single String: "file1.pdf")
+      return [fileString];
+    }
+  };
 
   // Fungsi Format Tanggal untuk Badge (JAN 25)
   const formatDateBadge = (dateString) => {
@@ -88,6 +101,7 @@ const Pengumuman = () => {
           ) : (
             pengumumanList.map((item) => {
               const { month, day } = formatDateBadge(item.tanggal);
+              const files = parseFiles(item.file_pdf); // Parse file disini
               
               return (
                 <div 
@@ -110,9 +124,10 @@ const Pengumuman = () => {
                       {item.isi}
                     </p>
                     {/* Indikator kecil jika ada lampiran */}
-                    {item.file_pdf && (
+                    {files.length > 0 && (
                         <div className="mt-2 inline-flex items-center gap-1 text-xs text-blue-500 font-medium bg-blue-50 px-2 py-1 rounded">
-                            <FileText size={12}/> Ada Lampiran PDF
+                            <Paperclip size={12}/> 
+                            {files.length > 1 ? `${files.length} Lampiran PDF` : 'Ada Lampiran PDF'}
                         </div>
                     )}
                   </div>
@@ -148,7 +163,7 @@ const Pengumuman = () => {
           <div className="bg-white w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden relative animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh]">
             
             {/* Header Modal */}
-            <div className="bg-blue-600 p-6 relative">
+            <div className="bg-blue-600 p-6 relative flex-shrink-0">
               <button 
                 onClick={() => setSelectedItem(null)}
                 className="absolute top-4 right-4 bg-white/20 hover:bg-white/40 text-white p-2 rounded-full transition-colors"
@@ -177,39 +192,55 @@ const Pengumuman = () => {
                 {selectedItem.isi}
               </div>
 
-              {/* === BAGIAN DOWNLOAD FILE PDF (DITAMBAHKAN) === */}
-              {selectedItem.file_pdf && (
-                <div className="mt-8 pt-6 border-t border-slate-100">
-                    <h4 className="text-sm font-semibold text-slate-900 mb-3 flex items-center gap-2">
-                        <FileText size={18} className="text-blue-600"/> Dokumen Lampiran
-                    </h4>
-                    <a 
-                        href={`${API_BASE_URL}/uploads/${selectedItem.file_pdf}`} 
-                        target="_blank" 
-                        rel="noreferrer"
-                        className="group flex items-center justify-between p-4 bg-slate-50 border border-slate-200 rounded-xl hover:border-blue-400 hover:bg-blue-50 transition-all duration-300"
-                    >
-                        <div className="flex items-center gap-3">
-                            <div className="bg-red-100 p-2 rounded-lg text-red-600">
-                                <FileText size={24} />
-                            </div>
-                            <div>
-                                <p className="font-semibold text-slate-800 text-sm group-hover:text-blue-700">Lihat / Download File PDF</p>
-                                <p className="text-xs text-slate-500">Klik untuk membuka lampiran resmi</p>
-                            </div>
+              {/* === BAGIAN DOWNLOAD FILE PDF (MULTIPLE FILES) === */}
+              {(() => {
+                 const files = parseFiles(selectedItem.file_pdf);
+                 if (files.length > 0) {
+                   return (
+                    <div className="mt-8 pt-6 border-t border-slate-100">
+                        <h4 className="text-sm font-semibold text-slate-900 mb-3 flex items-center gap-2">
+                            <FileText size={18} className="text-blue-600"/> 
+                            {files.length > 1 ? 'Dokumen Lampiran' : 'Dokumen Lampiran'}
+                        </h4>
+                        
+                        <div className="grid gap-3">
+                            {files.map((fileName, index) => (
+                                <a 
+                                    key={index}
+                                    href={`${API_BASE_URL}/uploads/${fileName}`} 
+                                    target="_blank" 
+                                    rel="noreferrer"
+                                    className="group flex items-center justify-between p-4 bg-slate-50 border border-slate-200 rounded-xl hover:border-blue-400 hover:bg-blue-50 transition-all duration-300"
+                                >
+                                    <div className="flex items-center gap-3">
+                                        <div className="bg-red-100 p-2 rounded-lg text-red-600">
+                                            <FileText size={24} />
+                                        </div>
+                                        <div>
+                                            {/* Menampilkan nama file asli jika memungkinkan, atau Lampiran ke-X */}
+                                            <p className="font-semibold text-slate-800 text-sm group-hover:text-blue-700 truncate max-w-[200px] sm:max-w-xs">
+                                                {fileName.replace(/^file-\d+-/, '')} {/* Regex untuk menghapus prefix timestamp unik jika mau, opsional */}
+                                            </p>
+                                            <p className="text-xs text-slate-500">Klik untuk melihat/download</p>
+                                        </div>
+                                    </div>
+                                    <div className="bg-white p-2 rounded-lg border border-slate-200 text-slate-400 group-hover:text-blue-600 group-hover:border-blue-200 transition-colors">
+                                        <Download size={20} />
+                                    </div>
+                                </a>
+                            ))}
                         </div>
-                        <div className="bg-white p-2 rounded-lg border border-slate-200 text-slate-400 group-hover:text-blue-600 group-hover:border-blue-200 transition-colors">
-                            <Download size={20} />
-                        </div>
-                    </a>
-                </div>
-              )}
+                    </div>
+                   );
+                 }
+                 return null;
+              })()}
               {/* === AKHIR BAGIAN DOWNLOAD === */}
 
             </div>
 
             {/* Footer Modal */}
-            <div className="p-4 bg-slate-50 border-t border-slate-100 text-right">
+            <div className="p-4 bg-slate-50 border-t border-slate-100 text-right flex-shrink-0">
               <button 
                 onClick={() => setSelectedItem(null)}
                 className="px-6 py-2 bg-white border border-slate-300 text-slate-700 font-medium rounded-lg hover:bg-slate-100 transition-colors"

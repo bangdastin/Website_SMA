@@ -67,7 +67,7 @@ const storage = multer.diskStorage({
 
 const upload = multer({ 
     storage: storage,
-    limits: { fileSize: 5 * 1024 * 1024 }, // Limit 5MB
+    limits: { fileSize: 5 * 1024 * 1024 }, // Limit 5MB per file
     fileFilter: (req, file, cb) => {
         if (file.mimetype.startsWith('image/') || file.mimetype === 'application/pdf') {
             cb(null, true);
@@ -318,29 +318,40 @@ app.delete('/api/prestasi/:id', (req, res) => {
 app.get('/api/pengumuman', (req, res) => {
     db.query("SELECT * FROM pengumuman ORDER BY tanggal DESC", (err, results) => res.json(err ? [] : results));
 });
-app.post('/api/pengumuman', upload.single('file_pdf'), (req, res) => {
+
+// POST Announcement (Updated for Multiple Files)
+app.post('/api/pengumuman', upload.array('files_pdf', 10), (req, res) => { // Allow max 10 files
     const { judul, isi, tanggal } = req.body;
-    const pdf = req.file ? req.file.filename : null;
-    db.query("INSERT INTO pengumuman (judul, isi, tanggal, file_pdf) VALUES (?, ?, ?, ?)", [judul, isi, tanggal, pdf], (err) => {
+    
+    // Convert filenames array to JSON string
+    const files = req.files ? req.files.map(f => f.filename) : [];
+    const filesJson = JSON.stringify(files); 
+
+    db.query("INSERT INTO pengumuman (judul, isi, tanggal, file_pdf) VALUES (?, ?, ?, ?)", [judul, isi, tanggal, filesJson], (err) => {
         if(err) return res.status(500).json({error: err.message});
         res.status(201).json({message: "Berhasil"});
     });
 });
-app.put('/api/pengumuman/:id', upload.single('file_pdf'), (req, res) => {
+
+// PUT Announcement (Updated for Multiple Files)
+app.put('/api/pengumuman/:id', upload.array('files_pdf', 10), (req, res) => {
     const { id } = req.params;
     const { judul, isi, tanggal } = req.body;
     let sql = "UPDATE pengumuman SET judul=?, isi=?, tanggal=? WHERE id=?";
     let params = [judul, isi, tanggal, id];
 
-    if (req.file) {
+    if (req.files && req.files.length > 0) {
+        const files = req.files.map(f => f.filename);
+        const filesJson = JSON.stringify(files);
         sql = "UPDATE pengumuman SET judul=?, isi=?, tanggal=?, file_pdf=? WHERE id=?";
-        params = [judul, isi, tanggal, req.file.filename, id];
+        params = [judul, isi, tanggal, filesJson, id];
     }
     db.query(sql, params, (err) => {
         if(err) return res.status(500).json({error: err.message});
         res.json({message: "Updated"});
     });
 });
+
 app.delete('/api/pengumuman/:id', (req, res) => {
     db.query("DELETE FROM pengumuman WHERE id = ?", [req.params.id], (err) => res.json({message: "Dihapus"}));
 });
