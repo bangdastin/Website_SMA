@@ -7,9 +7,9 @@ const Footer = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
         <div className="flex items-center justify-center gap-2 mb-6">
           <GraduationCap className="text-blue-500" />
-          <span className="text-xl font-bold text-white">SMA Unggulan</span>
+          <span className="text-xl font-bold text-white">SMA NEGERI 2 LINTONGNIHUTA</span>
         </div>
-        <p className="text-sm opacity-50">&copy; 2026 SMA Unggulan. All rights reserved.</p>
+        <p className="text-sm opacity-50">&copy; Gabriel & Dastin. All rights reserved.</p>
       </div>
     </footer>
   );

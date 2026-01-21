@@ -66,11 +66,12 @@ const Sidebar = ({ isOpen, activeMenu, onMenuClick, onLogout }) => {
   );
 };
 
-// --- 2. KARTU UJIAN COMPONENT ---
+// --- 2. KARTU UJIAN COMPONENT (DIPERBARUI SESUAI GAMBAR) ---
 const ExamCardView = ({ userData }) => {
+    // Cek Status (Logic tetap sama)
     if (userData.status !== 'Diterima') {
         return (
-            <div className="flex flex-col items-center justify-center h-[60vh] text-center p-8 animate-fade-in">
+            <div className="flex flex-col items-center justify-center h-[60vh] text-center p-8 animate-fade-in font-sans">
                 <div className="w-20 h-20 bg-orange-100 text-orange-500 rounded-full flex items-center justify-center mb-6"><AlertTriangle size={40} /></div>
                 <h2 className="text-2xl font-bold text-slate-800 mb-2">Kartu Belum Tersedia</h2>
                 <p className="text-slate-500 max-w-md">
@@ -80,30 +81,133 @@ const ExamCardView = ({ userData }) => {
             </div>
         );
     }
+
+    // Tampilan Kartu Resmi (Sesuai Gambar)
     return (
-        <div className="p-4 md:p-8 flex flex-col items-center animate-fade-in">
-            <div className="w-full max-w-lg flex justify-between items-center mb-6 print:hidden">
-                <h2 className="text-2xl font-bold text-slate-800">Kartu Ujian</h2>
-                <button onClick={() => window.print()} className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-lg shadow-lg flex items-center gap-2"><Printer size={18} /> Cetak</button>
+        <div className="p-4 md:p-8 flex flex-col items-center animate-fade-in bg-slate-50 min-h-screen">
+            <div className="w-full max-w-[21cm] flex justify-between items-center mb-6 print:hidden">
+                <h2 className="text-2xl font-bold text-slate-800 font-sans">Pratinjau Kartu</h2>
+                <button onClick={() => window.print()} className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-lg shadow-lg flex items-center gap-2 font-sans transition-all">
+                    <Printer size={18} /> Cetak Kartu (PDF)
+                </button>
             </div>
-            <div id="print-area" className="relative bg-white w-[500px] h-[300px] rounded-xl shadow-2xl overflow-hidden border border-slate-300 print:shadow-none print:border-2 print:border-black print:mx-auto">
-                <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/10 rounded-full -translate-y-1/2 translate-x-1/2"></div>
-                <div className="absolute bottom-0 left-0 w-24 h-24 bg-blue-500/10 rounded-full translate-y-1/2 -translate-x-1/2"></div>
-                <div className="bg-gradient-to-r from-blue-700 to-blue-600 h-20 flex items-center px-5 relative z-10">
-                    <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center text-blue-700 font-bold text-xs shadow-md">LOGO</div>
-                    <div className="ml-3 text-white"><h1 className="text-sm font-bold opacity-80 uppercase tracking-wide">Kartu Peserta Ujian</h1><h2 className="text-lg font-bold leading-tight">SMA NEGERI UNGGULAN</h2></div>
-                </div>
-                <div className="p-5 flex gap-4 h-[calc(100%-80px)] relative z-10">
-                    <div className="flex flex-col items-center justify-center w-28"><div className="w-24 h-32 bg-slate-100 border-2 border-slate-200 rounded-md flex items-center justify-center text-slate-300 shadow-inner"><User size={40} /></div><p className="text-[10px] text-slate-400 mt-1">2026/2027</p></div>
-                    <div className="flex-1 flex flex-col justify-between">
-                        <div>
-                            <div className="mb-2"><p className="text-[10px] text-slate-500 uppercase font-bold tracking-wider">Nama Peserta</p><p className="text-lg font-bold text-slate-800 leading-tight uppercase truncate">{userData.nama}</p></div>
-                            <div className="mb-2"><p className="text-[10px] text-slate-500 uppercase font-bold tracking-wider">No. Ujian</p><p className="text-base font-mono font-bold text-blue-600 tracking-wide">{userData.noUjian}</p></div>
-                            <div className="flex justify-between items-end"><div><p className="text-[10px] text-slate-500 uppercase font-bold tracking-wider">Lokasi</p><p className="text-xs font-bold text-slate-700">{userData.lokasi || 'Lab Komputer 1'}</p></div><div className="text-slate-800"><QrCode size={40} /></div></div>
-                        </div>
-                        <div className="w-full h-1.5 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-full mt-auto"></div>
+
+            {/* AREA CETAK (Kertas A4) */}
+            <div id="print-area" className="bg-white w-full max-w-[21cm] p-8 md:p-12 shadow-2xl print:shadow-none print:w-full print:max-w-none print:p-0 print:m-0 text-black font-serif relative">
+                
+                {/* 1. KOP SURAT */}
+                <div className="flex items-center justify-center border-b-[3px] border-black pb-4 mb-2 gap-4">
+                    {/* Logo (Menggunakan Logo Sumut dari URL Publik) */}
+                    <div className="w-[80px] h-auto flex-shrink-0">
+                        <img 
+                            src="https://upload.wikimedia.org/wikipedia/commons/thumb/b/ba/Coat_of_arms_of_North_Sumatra.svg/1200px-Coat_of_arms_of_North_Sumatra.svg.png" 
+                            alt="Logo Sumut" 
+                            className="w-full h-full object-contain" 
+                        />
+                    </div>
+                    <div className="text-center flex-1 leading-tight">
+                        <h3 className="text-[14px] font-medium tracking-wide">PEMERINTAH PROVINSI SUMATERA UTARA</h3>
+                        <h2 className="text-[18px] font-bold">DINAS PENDIDIKAN</h2>
+                        <h1 className="text-[22px] font-black tracking-wider my-1">SMA NEGERI 2 LINTONGNIHUTA</h1>
+                        <p className="text-[11px] font-normal">Jalan Letjend. TB. Simatupang, Desa Siponjot – Silaban, Kec. Lintongnihuta,</p>
+                        <p className="text-[11px] font-normal">Kab. Humbang Hasundutan, Cabdisdik Wil. IX Kode Pos 22475</p>
+                        <p className="text-[11px] text-blue-800 underline">Pos-el sman2lintongnihuta@gmail.com Laman : www.sman2lintongnihuta.sch.id</p>
                     </div>
                 </div>
+                {/* Garis Ganda Tipis di bawah garis tebal (Opsional style) */}
+                <div className="border-t border-black mb-6 w-full h-1"></div>
+
+                {/* 2. JUDUL KARTU */}
+                <div className="text-center mb-8">
+                    <h2 className="text-[16px] font-bold uppercase tracking-wide">KARTU PENDAFTARAN SELEKSI PENERIMAAN PESERTA DIDIK BARU</h2>
+                    <h3 className="text-[16px] font-bold uppercase">SMA NEGERI 2 LINTONGNIHUTA</h3>
+                    <h3 className="text-[16px] font-bold">TAHUN PELAJARAN 2026/2027</h3>
+                </div>
+
+                {/* 3. BIODATA (Menggunakan Grid/Table agar titik dua sejajar) */}
+                <div className="pl-4 mb-6 text-[14px]">
+                    <table className="w-full">
+                        <tbody>
+                            <tr>
+                                <td className="w-[180px] py-1">NOMOR PESERTA</td>
+                                <td className="py-1 font-bold">: {userData.noUjian || '26-02-00001'}</td>
+                            </tr>
+                            <tr>
+                                <td className="py-1">NAMA</td>
+                                <td className="py-1 uppercase">: {userData.nama}</td>
+                            </tr>
+                            <tr>
+                                <td className="py-1">ASAL SEKOLAH</td>
+                                <td className="py-1 uppercase">: {userData.asalSekolah}</td>
+                            </tr>
+                            <tr>
+                                <td className="py-1">JADWAL UJIAN</td>
+                                <td className="py-1">: Senin, 20 Mei 2026</td> {/* Hardcoded sesuai format umum */}
+                            </tr>
+                            <tr>
+                                <td className="py-1">PUKUL</td>
+                                <td className="py-1">: 07.30 WIB - Selesai</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                {/* 4. CATATAN */}
+                <div className="pl-4 mb-10 text-[14px]">
+                    <h4 className="font-bold underline mb-2">CATATAN:</h4>
+                    <ul className="list-none space-y-1">
+                        <li className="flex items-start gap-3">
+                            <span>□</span>
+                            <div>
+                                Perlengkapan yang harus dibawa pada saat ujian:
+                                <ul className="list-disc ml-5 mt-1">
+                                    <li>Kartu Ujian</li>
+                                    <li>Pensil 2B secukupnya, karet penghapus, raut pensil</li>
+                                    <li>Papan Ujian</li>
+                                </ul>
+                            </div>
+                        </li>
+                        <li className="flex items-start gap-3"><span>□</span> <span>Peserta wajib memakai seragam SMP (lengkap) selama mengikuti proses ujian.</span></li>
+                        <li className="flex items-start gap-3"><span>□</span> <span>Peserta wajib hadir 30 (tiga puluh) menit sebelum ujian dimulai.</span></li>
+                        <li className="flex items-start gap-3"><span>□</span> <span>Kartu Ujian ini harap disimpan untuk digunakan pada tahap seleksi berikutnya.</span></li>
+                        <li className="flex items-start gap-3"><span>□</span> <span>Informasi Lanjutan Selalu berada di Web sekolah</span></li>
+                    </ul>
+                </div>
+
+                {/* 5. TANDA TANGAN & FOTO */}
+                <div className="flex justify-between items-end px-4 mb-12">
+                    {/* Kotak Foto */}
+                    <div className="w-32 h-40 border-2 border-black flex flex-col items-center justify-center text-center">
+                        <span className="font-bold text-lg block">Pas</span>
+                        <span className="font-bold text-lg block">Foto</span>
+                        <span className="text-sm mt-2 text-gray-500">3 x 4</span>
+                    </div>
+
+                    {/* Tanda Tangan */}
+                    <div className="w-64 text-left relative">
+                        {/* Tanggal */}
+                        <div className="mb-1">
+                            Lintongnihuta, <span className="border-b border-dotted border-black min-w-[80px] inline-block text-center">Maret 2026</span>
+                        </div>
+                        <div className="mb-20 font-bold">Kepala SMA Negeri 2 Lintongnihuta</div>
+                        
+                        {/* Nama Kepsek */}
+                        <div className="font-bold underline">SAHALA SINAGA, M.Pd.</div>
+                        <div className="">NIP. 19741106 200604 1 008</div>
+                    </div>
+                </div>
+
+                 {/* 6. BAGIAN BAWAH (TEAR-OFF SLIP) SESUAI GAMBAR */}
+                 <div className="pt-6 border-t border-dashed border-slate-400 text-[13px] font-mono">
+                    <h4 className="font-bold underline mb-2">Cattana:</h4>
+                    <div className="grid gap-1">
+                         <div className="flex"><span className="w-32">No Peserta</span>: {userData.noUjian || '26-02-00001'}</div>
+                         <div className="flex"><span className="w-32">26</span>: tahun</div>
+                         <div className="flex"><span className="w-32">02</span>: KODE SEKOLAH</div>
+                         <div className="flex"><span className="w-32">00001</span>: no pendaftaran</div>
+                    </div>
+                 </div>
+
             </div>
         </div>
     );

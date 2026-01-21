@@ -17,7 +17,7 @@ const Navbar = () => {
             <div className="bg-blue-600 p-2 rounded-lg">
               <GraduationCap className="text-white w-6 h-6" />
             </div>
-            <span className="font-bold text-xl text-slate-800">SMA <span className="text-blue-600">Unggulan</span></span>
+            <span className="font-bold text-xl text-slate-800">SMA <span className="text-blue-600">Negeri 2 Lintongnihuta</span></span>
           </Link>
 
           {/* DESKTOP MENU */}
