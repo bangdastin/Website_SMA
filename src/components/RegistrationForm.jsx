@@ -2,36 +2,24 @@ import React, { useState, useEffect, useRef } from 'react';
 import { 
   User, Mail, Phone, School, MapPin, Calendar, Send, CheckCircle2, 
   AlertCircle, Loader2, Lock, Home, Camera, UploadCloud, FileText, 
-  X, Eye, Trash2 // Import icon tambahan
+  X, Eye, Trash2
 } from 'lucide-react';
 
-// --- KOMPONEN POPUP VALIDASI ---
 const ValidationModal = ({ isOpen, message, onClose }) => {
   if (!isOpen) return null;
-
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in">
       <div className="bg-white rounded-2xl shadow-2xl p-6 max-w-sm w-full text-center transform scale-100 transition-all">
-        <div className="w-16 h-16 bg-red-100 text-red-600 rounded-full flex items-center justify-center mx-auto mb-4">
-          <AlertCircle size={32} />
-        </div>
+        <div className="w-16 h-16 bg-red-100 text-red-600 rounded-full flex items-center justify-center mx-auto mb-4"><AlertCircle size={32} /></div>
         <h3 className="text-xl font-bold text-slate-800 mb-2">Peringatan</h3>
-        <p className="text-slate-600 mb-6 leading-relaxed">
-          {message}
-        </p>
-        <button 
-          onClick={onClose}
-          className="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-6 rounded-xl shadow-lg transition-all active:scale-95"
-        >
-          OK, Mengerti
-        </button>
+        <p className="text-slate-600 mb-6 leading-relaxed">{message}</p>
+        <button onClick={onClose} className="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-6 rounded-xl shadow-lg transition-all active:scale-95">OK, Mengerti</button>
       </div>
     </div>
   );
 };
 
 const RegistrationForm = ({ onSuccess, onGoHome, userData }) => {
-  // --- STATE DATA PRIBADI & RAPORT ---
   const [formData, setFormData] = useState({
     namaLengkap: '', nisn: '', tempatLahir: '', tglLahir: '', jenisKelamin: '', 
     nik: '', asalSekolah: '', agama: '', namaAyah: '', pekerjaanAyah: '', 
@@ -42,23 +30,15 @@ const RegistrationForm = ({ onSuccess, onGoHome, userData }) => {
     nilaiBhsInggris: { sem1: '', sem2: '', sem3: '', sem4: '', sem5: '' },
   });
 
-  // --- STATE FILE UPLOAD ---
-  const [files, setFiles] = useState({
-    pasFoto: null,         
-    raport1: null,         
-    sertifikat1: null      
-  });
-  
+  const [files, setFiles] = useState({ pasFoto: null, raport1: null, sertifikat1: null });
   const [fotoPreview, setFotoPreview] = useState(null);
+  const [existingFiles, setExistingFiles] = useState({ pasFoto: null, raport1: null, sertifikat1: null });
 
-  // --- STATE VALIDASI & LAINNYA ---
   const [validationMessage, setValidationMessage] = useState(""); 
   const [showValidationModal, setShowValidationModal] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
-  const [isAlreadyRegistered, setIsAlreadyRegistered] = useState(false); 
   const [suggestions, setSuggestions] = useState([]); 
   const [showSuggestions, setShowSuggestions] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
   
   const dropdownRef = useRef(null);
   const fileInputRef = useRef(null); 
@@ -73,28 +53,69 @@ const RegistrationForm = ({ onSuccess, onGoHome, userData }) => {
   const maxBirthDate = new Date(today.getFullYear() - 12, today.getMonth(), today.getDate());
   const maxDateStr = maxBirthDate.toISOString().split('T')[0];
 
-  const showError = (msg) => {
-    setValidationMessage(msg);
-    setShowValidationModal(true);
-  };
+  const showError = (msg) => { setValidationMessage(msg); setShowValidationModal(true); };
 
+  // --- EFFECT: LOAD DATA (PRE-FILL) ---
   useEffect(() => {
-    if (userData?.email) setFormData(prev => ({ ...prev, email: userData.email }));
-    if (userData && (userData.status === 'Menunggu' || userData.status === 'Diterima' || userData.status === 'Ditolak')) {
-        setIsAlreadyRegistered(true); setIsSubmitted(true); 
-        setFormData(prev => ({ ...prev, namaLengkap: userData.nama || '', asalSekolah: userData.asalSekolah || '' }));
+    if (userData) {
+        const safeParse = (str) => {
+            try { return JSON.parse(str) || { sem1: '', sem2: '', sem3: '', sem4: '', sem5: '' }; } 
+            catch (e) { return { sem1: '', sem2: '', sem3: '', sem4: '', sem5: '' }; }
+        };
+
+        setFormData(prev => ({
+            ...prev,
+            email: userData.email || '',
+            namaLengkap: userData.nama_lengkap || '',
+            nisn: userData.nisn || '',
+            tempatLahir: userData.tempat_lahir || '',
+            tglLahir: userData.tanggal_lahir ? userData.tanggal_lahir.split('T')[0] : '',
+            jenisKelamin: userData.jenis_kelamin || '',
+            nik: userData.nik || '',
+            asalSekolah: userData.asal_sekolah || '',
+            agama: userData.agama || '',
+            namaAyah: userData.nama_ayah || '',
+            pekerjaanAyah: userData.pekerjaan_ayah || '',
+            namaIbu: userData.nama_ibu || '',
+            pekerjaanIbu: userData.pekerjaan_ibu || '',
+            noTelp: userData.no_telepon || '',
+            alamatRumah: userData.alamat_rumah || '',
+            nilaiMatematika: typeof userData.nilai_matematika === 'string' ? safeParse(userData.nilai_matematika) : (userData.nilai_matematika || prev.nilaiMatematika),
+            nilaiBhsIndonesia: typeof userData.nilai_bhs_indonesia === 'string' ? safeParse(userData.nilai_bhs_indonesia) : (userData.nilai_bhs_indonesia || prev.nilaiBhsIndonesia),
+            nilaiIpa: typeof userData.nilai_ipa === 'string' ? safeParse(userData.nilai_ipa) : (userData.nilai_ipa || prev.nilaiIpa),
+            nilaiBhsInggris: typeof userData.nilai_bhs_inggris === 'string' ? safeParse(userData.nilai_bhs_inggris) : (userData.nilai_bhs_inggris || prev.nilaiBhsInggris),
+        }));
+
+        setExistingFiles({
+            pasFoto: userData.pas_foto || null,
+            raport1: userData.file_raport || null,
+            sertifikat1: userData.file_sertifikat || null
+        });
+
+        if (userData.pas_foto) {
+            setFotoPreview(`${API_BASE_URL}/uploads/${userData.pas_foto}`);
+        }
     }
   }, [userData]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
+    
+    // --- VALIDASI BARU ---
     if (name === 'tglLahir') {
         const selectedDate = new Date(value);
         if (selectedDate < minBirthDate) { showError("Mohon maaf, umur maksimal pendaftar adalah 17 tahun."); return; }
     }
     if (name === 'nik') {
-        if (value !== '' && !/^\d+$/.test(value)) { showError("NIK hanya boleh berisi angka (0-9)."); return; }
+        if (value !== '' && !/^\d+$/.test(value)) { return; } // Hanya angka saat ngetik
     }
+    if (name === 'nisn') {
+        if (value !== '' && !/^\d+$/.test(value)) { return; }
+    }
+    if (name === 'noTelp') {
+        if (value !== '' && !/^\d+$/.test(value)) { return; }
+    }
+
     setFormData(prev => ({ ...prev, [name]: value }));
     if (name === 'asalSekolah') setShowSuggestions(true); 
   };
@@ -125,6 +146,7 @@ const RegistrationForm = ({ onSuccess, onGoHome, userData }) => {
             if (img.width >= img.height) { showError("Orientasi Salah! Foto harus berbentuk Portrait (Tegak) sesuai rasio 3x4."); URL.revokeObjectURL(img.src); e.target.value = null; return; }
             setFiles(prev => ({ ...prev, [fileType]: file }));
             setFotoPreview(img.src);
+            setExistingFiles(prev => ({ ...prev, pasFoto: null }));
         };
         return;
     }
@@ -132,15 +154,20 @@ const RegistrationForm = ({ onSuccess, onGoHome, userData }) => {
     if (file.type !== 'application/pdf') { showError("Format Salah! Dokumen harus berformat PDF."); e.target.value = null; return; }
     if (file.size > 2 * 1024 * 1024) { showError("Ukuran File PDF terlalu besar! Maksimal 2MB."); e.target.value = null; return; }
     setFiles(prev => ({ ...prev, [fileType]: file }));
+    setExistingFiles(prev => ({ ...prev, [fileType]: null }));
   };
 
-  // Helper untuk menghapus file
   const removeFile = (fileType) => {
       setFiles(prev => ({ ...prev, [fileType]: null }));
-      // Reset input value agar bisa upload file yang sama lagi jika perlu
-      const inputId = `file-input-${fileType}`;
-      const inputEl = document.getElementById(inputId);
-      if(inputEl) inputEl.value = "";
+      if (fileType === 'pasFoto') {
+          setFotoPreview(null);
+          if (fileInputRef.current) fileInputRef.current.value = "";
+      } else {
+          const inputId = `file-input-${fileType}`;
+          const inputEl = document.getElementById(inputId);
+          if (inputEl) inputEl.value = "";
+      }
+      setExistingFiles(prev => ({ ...prev, [fileType]: null }));
   };
 
   const triggerPhotoInput = () => fileInputRef.current.click();
@@ -169,7 +196,16 @@ const RegistrationForm = ({ onSuccess, onGoHome, userData }) => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!formData.asalSekolah.toUpperCase().includes("SMP") && !formData.asalSekolah.toUpperCase().includes("MTS")) { showError("Mohon perbaiki Asal Sekolah (Harus SMP/MTs)."); return; }
-    if (!files.pasFoto) { showError("Wajib upload Pas Foto."); return; }
+    
+    // --- VALIDASI PANJANG KARAKTER SAAT SUBMIT ---
+    if (formData.nisn.length !== 10) { showError("NISN harus 10 digit."); return; }
+    if (formData.nik.length !== 16) { showError("NIK harus 16 digit."); return; }
+    // No Telp minimal 10, maksimal 13 biasanya, tapi request Anda minta fix 12?
+    // Jika STRICT 12: formData.noTelp.length !== 12
+    // Jika fleksibel (umum di Indo): 10-13 digit. Saya buat STRICT 12 sesuai request.
+    if (formData.noTelp.length !== 12) { showError("Nomor Telepon harus 12 digit."); return; }
+
+    if (!files.pasFoto && !existingFiles.pasFoto) { showError("Wajib upload Pas Foto."); return; }
     
     try {
       const dataToSend = new FormData();
@@ -216,7 +252,12 @@ const RegistrationForm = ({ onSuccess, onGoHome, userData }) => {
             <h3 className="text-lg font-bold text-slate-800 border-b pb-2 mb-4 flex items-center gap-2"><User size={20}/> Identitas Peserta Didik</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                 <div className="space-y-1"><label className="text-sm font-semibold">Nama Lengkap</label><input required name="namaLengkap" value={formData.namaLengkap} onChange={handleChange} className="w-full px-3 py-2 border rounded-lg" /></div>
-                <div className="space-y-1"><label className="text-sm font-semibold">NISN</label><input required name="nisn" value={formData.nisn} onChange={handleChange} className="w-full px-3 py-2 border rounded-lg" /></div>
+                
+                <div className="space-y-1">
+                    <label className="text-sm font-semibold">NISN</label>
+                    <input required name="nisn" value={formData.nisn} onChange={handleChange} className="w-full px-3 py-2 border rounded-lg" maxLength={10} placeholder="10 Digit Angka" inputMode="numeric"/>
+                </div>
+                
                 <div className="space-y-1"><label className="text-sm font-semibold">Tempat Lahir</label><input required name="tempatLahir" value={formData.tempatLahir} onChange={handleChange} className="w-full px-3 py-2 border rounded-lg" /></div>
                 <div className="space-y-1">
                     <label className="text-sm font-semibold">Tanggal Lahir</label>
@@ -226,13 +267,18 @@ const RegistrationForm = ({ onSuccess, onGoHome, userData }) => {
                 <div className="space-y-1"><label className="text-sm font-semibold">Jenis Kelamin</label>
                     <select required name="jenisKelamin" value={formData.jenisKelamin} onChange={handleChange} className="w-full px-3 py-2 border rounded-lg"><option value="">Pilih...</option><option value="Laki-laki">Laki-laki</option><option value="Perempuan">Perempuan</option></select>
                 </div>
-                <div className="space-y-1"><label className="text-sm font-semibold">NIK</label><input required name="nik" value={formData.nik} onChange={handleChange} className="w-full px-3 py-2 border rounded-lg" placeholder="Masukkan NIK" inputMode="numeric" /></div>
+                
+                <div className="space-y-1">
+                    <label className="text-sm font-semibold">NIK</label>
+                    <input required name="nik" value={formData.nik} onChange={handleChange} className="w-full px-3 py-2 border rounded-lg" placeholder="16 Digit Angka" maxLength={16} inputMode="numeric" />
+                </div>
+
                 <div className="space-y-1"><label className="text-sm font-semibold">Agama</label>
                     <select required name="agama" value={formData.agama} onChange={handleChange} className="w-full px-3 py-2 border rounded-lg"><option value="">Pilih...</option>{['Islam', 'Kristen', 'Katholik', 'Hindu', 'Budha', 'Konghucu', 'Kepercayaan'].map(opt => <option key={opt} value={opt}>{opt}</option>)}</select>
                 </div>
                 <div className="space-y-1 relative" ref={dropdownRef}>
                     <label className="text-sm font-semibold">Asal Sekolah</label>
-                    <input name="asalSekolah" value={formData.asalSekolah} onChange={handleChange} placeholder="Masukkan nama sekolah" className="w-full px-3 py-2 border rounded-lg" autoComplete="off"/>
+                    <input name="asalSekolah" value={formData.asalSekolah} onChange={handleChange} placeholder="Ketik Sekolah..." className="w-full px-3 py-2 border rounded-lg" autoComplete="off"/>
                     {showSuggestions && suggestions.length > 0 && (<ul className="absolute z-10 w-full bg-white border mt-1 shadow-lg max-h-40 overflow-y-auto">{suggestions.map((item, idx) => <li key={idx} onClick={() => handleSelectSchool(item)} className="px-3 py-2 hover:bg-gray-100 cursor-pointer text-sm">{item.value}</li>)}</ul>)}
                 </div>
                  <div className="space-y-1 md:col-span-2"><label className="text-sm font-semibold">Alamat Rumah</label><textarea required name="alamatRumah" value={formData.alamatRumah} onChange={handleChange} className="w-full px-3 py-2 border rounded-lg" rows="2" /></div>
@@ -247,7 +293,12 @@ const RegistrationForm = ({ onSuccess, onGoHome, userData }) => {
                 <div className="space-y-1"><label className="text-sm font-semibold">Pekerjaan Ayah</label><input required name="pekerjaanAyah" value={formData.pekerjaanAyah} onChange={handleChange} className="w-full px-3 py-2 border rounded-lg" /></div>
                 <div className="space-y-1"><label className="text-sm font-semibold">Nama Ibu</label><input required name="namaIbu" value={formData.namaIbu} onChange={handleChange} className="w-full px-3 py-2 border rounded-lg" /></div>
                 <div className="space-y-1"><label className="text-sm font-semibold">Pekerjaan Ibu</label><input required name="pekerjaanIbu" value={formData.pekerjaanIbu} onChange={handleChange} className="w-full px-3 py-2 border rounded-lg" /></div>
-                <div className="space-y-1"><label className="text-sm font-semibold">No Telp / WA</label><input required name="noTelp" value={formData.noTelp} onChange={handleChange} className="w-full px-3 py-2 border rounded-lg" /></div>
+                
+                <div className="space-y-1">
+                    <label className="text-sm font-semibold">No Telp / WA</label>
+                    <input required name="noTelp" value={formData.noTelp} onChange={handleChange} className="w-full px-3 py-2 border rounded-lg" placeholder="12 Digit Angka" maxLength={12} inputMode="numeric"/>
+                </div>
+                
                 <div className="space-y-1"><label className="text-sm font-semibold">Email</label><input disabled value={formData.email} className="w-full px-3 py-2 border rounded-lg bg-gray-100" /></div>
             </div>
           </div>
@@ -279,7 +330,7 @@ const RegistrationForm = ({ onSuccess, onGoHome, userData }) => {
                     <div onClick={triggerPhotoInput} className="w-32 h-44 border-2 border-dashed rounded-lg flex items-center justify-center cursor-pointer overflow-hidden bg-slate-50 hover:bg-blue-50 relative group">
                         {fotoPreview ? (
                             <>
-                                <img src={fotoPreview} className="w-full h-full object-cover" alt="Preview"/>
+                                <img src={fotoPreview} className="w-full h-full object-cover" alt="Preview" onError={(e) => { e.target.onerror = null; e.target.src='https://placehold.co/113x151?text=Img+Err'; }}/>
                                 <div className="absolute inset-0 bg-black/40 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-all">
                                     <Camera className="text-white mb-1"/>
                                     <span className="text-white text-xs font-bold">Ganti Foto</span>
@@ -300,40 +351,29 @@ const RegistrationForm = ({ onSuccess, onGoHome, userData }) => {
                         <div key={doc.key} className="p-3 border rounded-lg bg-slate-50 relative">
                             <label className="text-sm font-semibold block mb-2">{doc.label}</label>
                             
-                            {/* TAMPILAN PREVIEW JIKA FILE ADA */}
                             {files[doc.key] ? (
                                 <div className="flex items-center justify-between p-3 bg-white border border-blue-200 rounded-lg shadow-sm">
                                     <div className="flex items-center gap-3 overflow-hidden">
-                                        <div className="w-10 h-10 bg-red-100 text-red-500 rounded-lg flex items-center justify-center flex-shrink-0">
-                                            <FileText size={20} />
-                                        </div>
+                                        <div className="w-10 h-10 bg-green-100 text-green-500 rounded-lg flex items-center justify-center flex-shrink-0"><FileText size={20} /></div>
                                         <div className="flex flex-col min-w-0">
                                             <p className="text-sm font-medium text-slate-700 truncate max-w-[180px]">{files[doc.key].name}</p>
-                                            <p className="text-[10px] text-slate-400">{(files[doc.key].size / 1024 / 1024).toFixed(2)} MB</p>
+                                            <p className="text-[10px] text-green-600 font-bold">File Baru</p>
                                         </div>
                                     </div>
-                                    <div className="flex items-center gap-2">
-                                        <a 
-                                            href={URL.createObjectURL(files[doc.key])} 
-                                            target="_blank" 
-                                            rel="noopener noreferrer"
-                                            className="p-2 text-blue-600 hover:bg-blue-50 rounded-full transition-colors"
-                                            title="Lihat File"
-                                        >
-                                            <Eye size={18} /> 
-                                        </a>
-                                        <button 
-                                            type="button"
-                                            onClick={() => removeFile(doc.key)}
-                                            className="p-2 text-red-500 hover:bg-red-50 rounded-full transition-colors"
-                                            title="Hapus File"
-                                        >
-                                            <Trash2 size={18} />
-                                        </button>
+                                    <button type="button" onClick={() => removeFile(doc.key)} className="p-2 text-red-500 hover:bg-red-50 rounded-full transition-colors"><Trash2 size={18} /></button>
+                                </div>
+                            ) : existingFiles[doc.key] ? (
+                                <div className="flex items-center justify-between p-3 bg-white border border-slate-200 rounded-lg shadow-sm">
+                                    <div className="flex items-center gap-3 overflow-hidden">
+                                        <div className="w-10 h-10 bg-blue-100 text-blue-500 rounded-lg flex items-center justify-center flex-shrink-0"><FileText size={20} /></div>
+                                        <div className="flex flex-col min-w-0">
+                                            <p className="text-sm font-medium text-slate-700 truncate max-w-[180px]">File Tersimpan</p>
+                                            <a href={`${API_BASE_URL}/uploads/${existingFiles[doc.key]}`} target="_blank" rel="noreferrer" className="text-[10px] text-blue-500 underline">Lihat File</a>
+                                        </div>
                                     </div>
+                                    <button type="button" onClick={() => removeFile(doc.key)} className="p-2 text-red-500 hover:bg-red-50 rounded-full transition-colors" title="Ganti File"><Trash2 size={18} /></button>
                                 </div>
                             ) : (
-                                // TAMPILAN INPUT JIKA KOSONG
                                 <>
                                     <input 
                                         id={`file-input-${doc.key}`}
