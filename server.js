@@ -71,7 +71,7 @@ const transporter = nodemailer.createTransport({
 });
 
 // ==================================================================
-// 6. KONFIGURASI UPLOAD (MULTER)
+// 6. KONFIGURASI UPLOAD (MULTER) - DIPERBARUI UNTUK PDF
 // ==================================================================
 const storage = multer.diskStorage({
     destination: function (req, file, cb) {
@@ -85,18 +85,19 @@ const storage = multer.diskStorage({
     },
     filename: function (req, file, cb) {
         const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-        cb(null, 'img-' + uniqueSuffix + path.extname(file.originalname)); 
+        cb(null, 'file-' + uniqueSuffix + path.extname(file.originalname)); 
     }
 });
 
 const upload = multer({ 
     storage: storage,
-    limits: { fileSize: 5 * 1024 * 1024 }, 
+    limits: { fileSize: 5 * 1024 * 1024 }, // Limit 5MB
     fileFilter: (req, file, cb) => {
-        if (file.mimetype.startsWith('image/')) {
+        // [PERBAIKAN] Izinkan Image DAN PDF
+        if (file.mimetype.startsWith('image/') || file.mimetype === 'application/pdf') {
             cb(null, true);
         } else {
-            cb(new Error('Format salah! Hanya boleh upload foto (JPG/PNG).'));
+            cb(new Error('Format salah! Hanya boleh upload foto (JPG/PNG) atau PDF.'));
         }
     }
 });
@@ -157,13 +158,6 @@ app.post('/api/auth/login', (req, res) => {
         
         if (results.length > 0) {
             const user = results[0];
-            
-            // LOGIKA ADMIN MANUAL (Hardcoded Email)
-            // Jika email terdaftar di sini -> Admin. Selain itu -> User.
-            const adminEmails = ['geraldnael@gmail.com', 'admin@sekolah.id']; 
-            // const userRole = adminEmails.includes(user.email) ? 'admin' : 'user'; 
-            
-            // JIKA MAU SEMUA MASUK USER DASHBOARD, PAKSA JADI 'user'
             const userRole = 'user'; 
 
             res.status(200).json({ 
@@ -235,7 +229,6 @@ app.post('/api/auth/reset-password', (req, res) => {
 // 8. API ENDPOINTS (DATA SISWA & REGISTRASI)
 // ==================================================================
 
-// --- [PERBAIKAN UTAMA: FETCH PROFIL DENGAN FALLBACK] ---
 app.get('/api/users/:id', (req, res) => {
     const { id } = req.params; // ID dari users1 (akun login)
 
@@ -258,7 +251,7 @@ app.get('/api/users/:id', (req, res) => {
                     id: userAccount.id // Pastikan ID yang dikembalikan adalah ID Akun agar konsisten
                 });
             } else {
-                // Profil TIDAK Ditemukan -> Return Data Dummy (Agar frontend tidak error 404 loop)
+                // Profil TIDAK Ditemukan -> Return Data Dummy
                 res.json({
                     id: userAccount.id,
                     email: userAccount.email,
@@ -302,7 +295,6 @@ app.post('/api/register', (req, res) => {
     const { namaLengkap, email, noTelp, tglLahir, asalSekolah, alamatRumah } = req.body;
     
     // Gunakan UPDATE atau INSERT (Upsert Logic)
-    // Cek dulu apakah data sudah ada di tabel users
     db.query("SELECT * FROM users WHERE email = ?", [email], (err, results) => {
         if(err) return res.status(500).json({message: "Database Error"});
 
@@ -314,8 +306,7 @@ app.post('/api/register', (req, res) => {
                 res.status(200).json({ message: "Formulir Berhasil Disimpan" });
             });
         } else {
-            // Data tidak ada -> INSERT BARU (Mengatasi jika data users hilang)
-            // Kita perlu ambil NIK/Username dari users1 dulu
+            // Data tidak ada -> INSERT BARU
             db.query("SELECT nik, username FROM users1 WHERE email = ?", [email], (err2, res2) => {
                 if(res2.length > 0) {
                     const { nik, username } = res2[0];
@@ -332,7 +323,6 @@ app.post('/api/register', (req, res) => {
     });
 });
 
-// --- [PERBAIKAN UPLOAD: MENGGUNAKAN ID USER AGAR TIDAK SALAH UPDATE] ---
 app.post('/api/upload-payment', upload.single('buktiBayar'), (req, res) => {
     // 1. Validasi File
     if (!req.file) return res.status(400).json({ message: "Pilih foto terlebih dahulu." });
@@ -345,11 +335,10 @@ app.post('/api/upload-payment', upload.single('buktiBayar'), (req, res) => {
         return res.status(400).json({ message: "User ID tidak ditemukan dalam request." });
     }
 
-    // 3. Cari User di tabel Akun (users1) untuk memastikan ID valid dan mendapatkan Email asli
+    // 3. Cari User di tabel Akun (users1)
     db.query("SELECT email FROM users1 WHERE id = ?", [userId], (err, results) => {
         if(err || results.length === 0) {
             console.error("❌ Error cari user by ID:", err);
-            // Hapus file jika user tidak valid agar tidak menuh-menuhin server
             if (fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
             return res.status(500).json({ message: "User ID tidak valid atau user tidak ditemukan." });
         }
@@ -357,8 +346,7 @@ app.post('/api/upload-payment', upload.single('buktiBayar'), (req, res) => {
         const emailUser = results[0].email;
         console.log(`📸 Uploading bukti bayar untuk User ID: ${userId} (${emailUser})`);
 
-        // 4. Update tabel Profil Siswa (users) menggunakan EMAIL yang didapat dari database (Bukan dari frontend)
-        // Ini menjamin update hanya terjadi pada user yang punya ID tersebut
+        // 4. Update tabel Profil Siswa
         const sql = "UPDATE users SET bukti_pembayaran = ?, status_pendaftaran = 'Menunggu' WHERE email = ?";
         
         db.query(sql, [req.file.filename, emailUser], (errUpdate, resUpdate) => {
@@ -373,7 +361,6 @@ app.post('/api/upload-payment', upload.single('buktiBayar'), (req, res) => {
     });
 
 }, (error, req, res, next) => {
-    // Error Handling untuk Multer (misal file terlalu besar)
     console.error("❌ Multer Error:", error.message);
     res.status(400).json({ message: error.message });
 });
@@ -452,7 +439,7 @@ app.post('/api/prestasi', upload.single('gambar'), (req, res) => {
     });
 });
 
-// UPDATE PRESTASI (Termasuk Update Gambar)
+// UPDATE PRESTASI
 app.put('/api/prestasi/:id', upload.single('gambar'), (req, res) => {
     const { id } = req.params;
     const { judul, deskripsi, tanggal, penyelenggara } = req.body;
@@ -501,7 +488,7 @@ app.delete('/api/prestasi/:id', (req, res) => {
 });
 
 // ==================================================================
-// 11. API ENDPOINTS (MANAJEMEN PENGUMUMAN)
+// 11. API ENDPOINTS (MANAJEMEN PENGUMUMAN - DIPERBARUI UNTUK PDF)
 // ==================================================================
 
 // GET Pengumuman
@@ -513,34 +500,79 @@ app.get('/api/pengumuman', (req, res) => {
     });
 });
 
-// POST Pengumuman
-app.post('/api/pengumuman', (req, res) => {
+// POST Pengumuman (Sekarang Support Upload File PDF)
+app.post('/api/pengumuman', upload.single('file_pdf'), (req, res) => {
     const { judul, isi, tanggal } = req.body;
-    const sql = "INSERT INTO pengumuman (judul, isi, tanggal) VALUES (?, ?, ?)";
-    db.query(sql, [judul, isi, tanggal], (err, result) => {
+    const filePdf = req.file ? req.file.filename : null;
+
+    const sql = "INSERT INTO pengumuman (judul, isi, tanggal, file_pdf) VALUES (?, ?, ?, ?)";
+    db.query(sql, [judul, isi, tanggal, filePdf], (err, result) => {
         if (err) return res.status(500).json({ error: err.message });
         res.status(201).json({ message: "Pengumuman berhasil ditambahkan" });
     });
 });
 
-// PUT Pengumuman
-app.put('/api/pengumuman/:id', (req, res) => {
+// PUT Pengumuman (Update Data & PDF)
+app.put('/api/pengumuman/:id', upload.single('file_pdf'), (req, res) => {
     const { id } = req.params;
     const { judul, isi, tanggal } = req.body;
-    const sql = "UPDATE pengumuman SET judul=?, isi=?, tanggal=? WHERE id=?";
-    db.query(sql, [judul, isi, tanggal, id], (err, result) => {
-        if (err) return res.status(500).json({ error: err.message });
-        res.json({ message: "Pengumuman berhasil diupdate" });
-    });
+    
+    // Cek apakah ada file baru yang diupload
+    if (req.file) {
+        const newFile = req.file.filename;
+
+        // Ambil file lama untuk dihapus
+        db.query("SELECT file_pdf FROM pengumuman WHERE id = ?", [id], (err, results) => {
+            if (results.length > 0) {
+                const oldFile = results[0].file_pdf;
+                // Hapus file lama jika ada
+                if (oldFile && fs.existsSync(path.join(__dirname, 'uploads', oldFile))) {
+                    fs.unlinkSync(path.join(__dirname, 'uploads', oldFile));
+                }
+            }
+
+            // Update database dengan file baru
+            const sql = "UPDATE pengumuman SET judul=?, isi=?, tanggal=?, file_pdf=? WHERE id=?";
+            db.query(sql, [judul, isi, tanggal, newFile, id], (err) => {
+                if (err) return res.status(500).json({ error: err.message });
+                res.json({ message: "Pengumuman & File berhasil diupdate" });
+            });
+        });
+    } else {
+        // Jika tidak ada file baru, update data teks saja
+        const sql = "UPDATE pengumuman SET judul=?, isi=?, tanggal=? WHERE id=?";
+        db.query(sql, [judul, isi, tanggal, id], (err, result) => {
+            if (err) return res.status(500).json({ error: err.message });
+            res.json({ message: "Pengumuman berhasil diupdate (File tetap)" });
+        });
+    }
 });
 
-// DELETE Pengumuman
+// DELETE Pengumuman (Hapus File juga)
 app.delete('/api/pengumuman/:id', (req, res) => {
     const { id } = req.params;
-    const sql = "DELETE FROM pengumuman WHERE id=?";
-    db.query(sql, [id], (err, result) => {
+
+    // Ambil nama file sebelum menghapus data
+    db.query("SELECT file_pdf FROM pengumuman WHERE id = ?", [id], (err, results) => {
         if (err) return res.status(500).json({ error: err.message });
-        res.json({ message: "Pengumuman berhasil dihapus" });
+
+        if (results.length > 0) {
+            const filePdf = results[0].file_pdf;
+            
+            // Hapus data dari database
+            db.query("DELETE FROM pengumuman WHERE id=?", [id], (errDelete) => {
+                if (errDelete) return res.status(500).json({ error: errDelete.message });
+                
+                // Hapus file fisik jika ada
+                if (filePdf && fs.existsSync(path.join(__dirname, 'uploads', filePdf))) {
+                    fs.unlinkSync(path.join(__dirname, 'uploads', filePdf));
+                }
+                
+                res.json({ message: "Pengumuman berhasil dihapus" });
+            });
+        } else {
+            res.status(404).json({ message: "Data tidak ditemukan" });
+        }
     });
 });
 

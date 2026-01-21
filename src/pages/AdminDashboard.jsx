@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Users, LogOut, Bell, Search, School, RefreshCw, Loader2, Check, X, AlertTriangle, 
-  Trophy, Megaphone, Plus, Trash2, Calendar, ImageIcon, Phone, Edit, FileText, Eye
+  Trophy, Megaphone, Plus, Trash2, Calendar, ImageIcon, Phone, Edit, FileText, Eye, Download
 } from 'lucide-react';
 import Footer from '../Footer'; 
 
@@ -181,7 +181,7 @@ const PrestasiManager = ({ showAlert }) => {
 };
 
 // =================================================================
-// MANAGER: PENGUMUMAN
+// MANAGER: PENGUMUMAN (DIPERBARUI DENGAN VALIDASI 2MB)
 // =================================================================
 const PengumumanManager = ({ showAlert }) => {
   const [dataList, setDataList] = useState([]);
@@ -189,7 +189,10 @@ const PengumumanManager = ({ showAlert }) => {
   const [showForm, setShowForm] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [editId, setEditId] = useState(null);
+  
+  // State Form
   const [formData, setFormData] = useState({ judul: '', isi: '', tanggal: '' });
+  const [pdfFile, setPdfFile] = useState(null); 
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const fetchData = async () => {
@@ -208,26 +211,51 @@ const PengumumanManager = ({ showAlert }) => {
     setEditId(item.id);
     setIsEditing(true);
     setShowForm(true);
+    setPdfFile(null); 
   };
 
   const resetForm = () => {
     setFormData({ judul: '', isi: '', tanggal: '' });
+    setPdfFile(null);
     setIsEditing(false);
     setEditId(null);
     setShowForm(false);
   };
 
+  // --- FUNGSI BARU: VALIDASI UKURAN FILE ---
+  const handleFileChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+        // Validasi: 2MB = 2 * 1024 * 1024 bytes
+        const maxSize = 2 * 1024 * 1024; 
+        
+        if (file.size > maxSize) {
+            showAlert('error', 'File Terlalu Besar', 'Maksimal ukuran file PDF adalah 2MB.');
+            e.target.value = null; // Reset input file
+            setPdfFile(null);
+            return;
+        }
+        setPdfFile(file);
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsSubmitting(true);
+    
+    const data = new FormData();
+    data.append('judul', formData.judul);
+    data.append('isi', formData.isi);
+    data.append('tanggal', formData.tanggal);
+    if (pdfFile) {
+        data.append('file_pdf', pdfFile);
+    }
+
     try {
       let url = isEditing ? `${API_BASE_URL}/api/pengumuman/${editId}` : `${API_BASE_URL}/api/pengumuman`;
       let method = isEditing ? 'PUT' : 'POST';
-      const res = await fetch(url, {
-        method, 
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData)
-      });
+      
+      const res = await fetch(url, { method, body: data });
 
       if (res.ok) {
         showAlert('success', 'Berhasil', isEditing ? 'Pengumuman diperbarui' : 'Pengumuman ditambahkan');
@@ -266,6 +294,26 @@ const PengumumanManager = ({ showAlert }) => {
                <input required type="text" className="p-2 border rounded-lg" value={formData.judul} onChange={e=>setFormData({...formData, judul: e.target.value})} placeholder="Judul Pengumuman..." />
                <input required type="date" className="p-2 border rounded-lg" value={formData.tanggal} onChange={e=>setFormData({...formData, tanggal: e.target.value})} />
             </div>
+            
+            {/* INPUT FILE DENGAN VALIDASI */}
+            <div className="w-full">
+                <label className="block text-sm font-medium text-slate-700 mb-1">Upload File PDF (Opsional)</label>
+                <div className="flex items-center gap-2">
+                    <input 
+                        type="file" 
+                        accept="application/pdf"
+                        onChange={handleFileChange} 
+                        className="w-full p-2 border rounded-lg bg-white text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100" 
+                    />
+                </div>
+                <p className="text-xs text-slate-400 mt-1 flex items-center gap-1">
+                    <AlertTriangle size={12}/> Maksimal ukuran file: 2MB. Format: .pdf
+                </p>
+                {isEditing && !pdfFile && (
+                    <p className="text-xs text-orange-500 mt-1">*Biarkan kosong jika tidak ingin mengubah file PDF yang sudah ada.</p>
+                )}
+            </div>
+
             <textarea required className="p-2 border rounded-lg h-32" value={formData.isi} onChange={e=>setFormData({...formData, isi: e.target.value})} placeholder="Isi pengumuman lengkap..."></textarea>
           </div>
           <div className="mt-4 flex justify-end gap-2">
@@ -289,6 +337,21 @@ const PengumumanManager = ({ showAlert }) => {
                         </span>
                     </div>
                     <p className="text-sm text-slate-600 whitespace-pre-wrap">{item.isi}</p>
+                    
+                    {item.file_pdf && (
+                        <div className="mt-3">
+                            <a 
+                                href={`${API_BASE_URL}/uploads/${item.file_pdf}`} 
+                                target="_blank" 
+                                rel="noreferrer"
+                                className="inline-flex items-center gap-2 text-sm bg-white border border-slate-200 px-3 py-1.5 rounded-lg text-blue-600 hover:bg-blue-50 transition-colors shadow-sm"
+                            >
+                                <FileText size={16} className="text-red-500"/>
+                                <span className="font-medium">Lihat Lampiran PDF</span>
+                                <Download size={14} className="ml-1 opacity-50"/>
+                            </a>
+                        </div>
+                    )}
                 </div>
                 <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                     <button onClick={() => handleEdit(item)} className="p-2 bg-blue-100 text-blue-600 hover:bg-blue-200 rounded-lg"><Edit size={16}/></button>

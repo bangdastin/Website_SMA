@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowRight, Calendar, Bell, X, Clock } from 'lucide-react';
+// Menambahkan FileText dan Download ke import
+import { ArrowRight, Calendar, Bell, X, Clock, FileText, Download } from 'lucide-react';
 
 const Pengumuman = () => {
   const [pengumumanList, setPengumumanList] = useState([]);
@@ -108,6 +109,12 @@ const Pengumuman = () => {
                     <p className="text-slate-500 text-sm leading-relaxed line-clamp-2">
                       {item.isi}
                     </p>
+                    {/* Indikator kecil jika ada lampiran */}
+                    {item.file_pdf && (
+                        <div className="mt-2 inline-flex items-center gap-1 text-xs text-blue-500 font-medium bg-blue-50 px-2 py-1 rounded">
+                            <FileText size={12}/> Ada Lampiran PDF
+                        </div>
+                    )}
                   </div>
 
                   {/* Tombol Panah */}
@@ -169,6 +176,36 @@ const Pengumuman = () => {
               <div className="prose prose-slate max-w-none text-slate-700 leading-relaxed whitespace-pre-wrap">
                 {selectedItem.isi}
               </div>
+
+              {/* === BAGIAN DOWNLOAD FILE PDF (DITAMBAHKAN) === */}
+              {selectedItem.file_pdf && (
+                <div className="mt-8 pt-6 border-t border-slate-100">
+                    <h4 className="text-sm font-semibold text-slate-900 mb-3 flex items-center gap-2">
+                        <FileText size={18} className="text-blue-600"/> Dokumen Lampiran
+                    </h4>
+                    <a 
+                        href={`${API_BASE_URL}/uploads/${selectedItem.file_pdf}`} 
+                        target="_blank" 
+                        rel="noreferrer"
+                        className="group flex items-center justify-between p-4 bg-slate-50 border border-slate-200 rounded-xl hover:border-blue-400 hover:bg-blue-50 transition-all duration-300"
+                    >
+                        <div className="flex items-center gap-3">
+                            <div className="bg-red-100 p-2 rounded-lg text-red-600">
+                                <FileText size={24} />
+                            </div>
+                            <div>
+                                <p className="font-semibold text-slate-800 text-sm group-hover:text-blue-700">Lihat / Download File PDF</p>
+                                <p className="text-xs text-slate-500">Klik untuk membuka lampiran resmi</p>
+                            </div>
+                        </div>
+                        <div className="bg-white p-2 rounded-lg border border-slate-200 text-slate-400 group-hover:text-blue-600 group-hover:border-blue-200 transition-colors">
+                            <Download size={20} />
+                        </div>
+                    </a>
+                </div>
+              )}
+              {/* === AKHIR BAGIAN DOWNLOAD === */}
+
             </div>
 
             {/* Footer Modal */}
