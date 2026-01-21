@@ -2,27 +2,27 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Reset dasar agar dashboard bisa full screen */
+/* === RESET GLOBAL === */
 :root {
   font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
   line-height: 1.5;
   font-weight: 400;
 }
 
-/* Hapus margin default browser & pastikan background menyatu */
 body {
   margin: 0;
   padding: 0;
-  min-width: 320px;
+  width: 100%;
   min-height: 100vh;
-  background-color: #f8fafc; /* Sesuai dengan bg-slate-50 di App.jsx */
+  /* Hapus background-color statis disini agar tidak menimpa background halaman LandingPage */
+  /* background-color: #f8fafc;  <-- HAPUS ATAU KOMENTARI INI */
 }
 
-/* Pastikan elemen root React mengambil lebar penuh */
 #root {
   width: 100%;
   height: 100%;
   margin: 0;
   padding: 0;
-  text-align: left; /* Kembalikan ke rata kiri, bukan center */
+  text-align: left; /* Pastikan rata kiri */
+  isolation: isolate; /* Memastikan stacking context baru */
 }
