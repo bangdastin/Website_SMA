@@ -67,7 +67,7 @@ const storage = multer.diskStorage({
 
 const upload = multer({ 
     storage: storage,
-    limits: { fileSize: 5 * 1024 * 1024 }, // Limit 5MB per file
+    limits: { fileSize: 5 * 1024 * 1024 }, 
     fileFilter: (req, file, cb) => {
         if (file.mimetype.startsWith('image/') || file.mimetype === 'application/pdf') {
             cb(null, true);
@@ -77,7 +77,7 @@ const upload = multer({
     }
 });
 
-// AUTH
+// --- AUTHENTICATION ---
 app.post('/api/auth/register', (req, res) => {
     const { nik, username, email, password } = req.body;
     if (!nik || !username || !email || !password) return res.status(400).json({ message: "Data tidak lengkap!" });
@@ -172,7 +172,7 @@ app.post('/api/auth/reset-password', (req, res) => {
     });
 });
 
-// GET USER
+// --- USER PROFILE & PPDB FORM ---
 app.get('/api/users/:id', (req, res) => {
     const { id } = req.params; 
     db.query("SELECT * FROM users1 WHERE id = ?", [id], (err, results) => {
@@ -184,24 +184,24 @@ app.get('/api/users/:id', (req, res) => {
             if (profiles.length > 0) {
                 res.json({ ...profiles[0], id: userAccount.id });
             } else {
+                // Return default data if profile doesn't exist yet
                 res.json({ 
                     id: userAccount.id, email: userAccount.email, username: userAccount.username, 
                     nama_lengkap: userAccount.username, status_pendaftaran: 'Belum', 
-                    asal_sekolah: '-', no_ujian: '-', bukti_pembayaran: null 
+                    asal_sekolah: '-', no_ujian: '-' 
                 });
             }
         });
     });
 });
 
-// REGISTER FORM (UPSERT)
 app.post('/api/register', upload.fields([
     { name: 'pasFoto', maxCount: 1 },
     { name: 'raport1', maxCount: 1 },
     { name: 'sertifikat1', maxCount: 1 }
 ]), (req, res) => {
     const { 
-        userId, namaLengkap, email, noTelp, tglLahir, tempatLahir, jenisKelamin, nik, nisn, agama, asalSekolah, alamatRumah,
+        email, namaLengkap, noTelp, tglLahir, tempatLahir, jenisKelamin, nik, nisn, agama, asalSekolah, alamatRumah,
         namaAyah, pekerjaanAyah, namaIbu, pekerjaanIbu,
         nilaiMatematika, nilaiBhsIndonesia, nilaiIpa, nilaiBhsInggris
     } = req.body;
@@ -214,12 +214,12 @@ app.post('/api/register', upload.fields([
         if(err) return res.status(500).json({message: "Database Error", error: err});
 
         if(results.length > 0) {
-            // --- UPDATE DATA ---
+            // UPDATE DATA (Tanpa kolom bukti_pembayaran)
             let sql = `UPDATE users SET 
                 nama_lengkap=?, no_telepon=?, tanggal_lahir=?, tempat_lahir=?, jenis_kelamin=?, nik=?, nisn=?, agama=?, asal_sekolah=?, alamat_rumah=?,
                 nama_ayah=?, pekerjaan_ayah=?, nama_ibu=?, pekerjaan_ibu=?,
                 nilai_matematika=?, nilai_bhs_indonesia=?, nilai_ipa=?, nilai_bhs_inggris=?,
-                status_pendaftaran='Menunggu'`; // Status kembali ke Menunggu jika di-edit
+                status_pendaftaran='Menunggu'`; 
             
             const params = [
                 namaLengkap, noTelp, tglLahir, tempatLahir, jenisKelamin, nik, nisn, agama, asalSekolah, alamatRumah,
@@ -240,7 +240,7 @@ app.post('/api/register', upload.fields([
             });
 
         } else {
-            // --- INSERT DATA BARU ---
+            // INSERT DATA BARU (Tanpa kolom bukti_pembayaran)
             const sql = `INSERT INTO users (
                 email, nama_lengkap, no_telepon, tanggal_lahir, tempat_lahir, jenis_kelamin, nik, nisn, agama, asal_sekolah, alamat_rumah,
                 nama_ayah, pekerjaan_ayah, nama_ibu, pekerjaan_ibu,
@@ -256,17 +256,14 @@ app.post('/api/register', upload.fields([
             ];
 
             db.query(sql, params, (errInsert) => {
-                if (errInsert) {
-                    console.error("Insert Error:", errInsert);
-                    return res.status(500).json({ message: "Gagal menyimpan data baru", error: errInsert });
-                }
+                if (errInsert) return res.status(500).json({ message: "Gagal menyimpan data baru", error: errInsert });
                 res.status(200).json({ message: "Data Berhasil Disimpan" });
             });
         }
     });
 });
 
-// ADMIN API
+// --- ADMIN API ---
 app.get('/api/users', (req, res) => {
     db.query("SELECT * FROM users ORDER BY id DESC", (err, results) => {
         if (err) return res.status(500).json({ error: err.message });
@@ -283,10 +280,11 @@ app.put('/api/users/:id/status', (req, res) => {
     });
 });
 
-// PRESTASI
+// --- PRESTASI ---
 app.get('/api/prestasi', (req, res) => {
     db.query("SELECT * FROM prestasi ORDER BY tanggal DESC", (err, results) => res.json(err ? [] : results));
 });
+
 app.post('/api/prestasi', upload.single('gambar'), (req, res) => {
     const { judul, deskripsi, tanggal, penyelenggara } = req.body;
     const gambar = req.file ? req.file.filename : null;
@@ -295,6 +293,7 @@ app.post('/api/prestasi', upload.single('gambar'), (req, res) => {
         res.status(201).json({message: "Berhasil"});
     });
 });
+
 app.put('/api/prestasi/:id', upload.single('gambar'), (req, res) => {
     const { id } = req.params;
     const { judul, deskripsi, tanggal, penyelenggara } = req.body;
@@ -310,20 +309,18 @@ app.put('/api/prestasi/:id', upload.single('gambar'), (req, res) => {
         res.json({message: "Updated"});
     });
 });
+
 app.delete('/api/prestasi/:id', (req, res) => {
     db.query("DELETE FROM prestasi WHERE id = ?", [req.params.id], (err) => res.json({message: "Dihapus"}));
 });
 
-// PENGUMUMAN
+// --- PENGUMUMAN ---
 app.get('/api/pengumuman', (req, res) => {
     db.query("SELECT * FROM pengumuman ORDER BY tanggal DESC", (err, results) => res.json(err ? [] : results));
 });
 
-// POST Announcement (Updated for Multiple Files)
-app.post('/api/pengumuman', upload.array('files_pdf', 10), (req, res) => { // Allow max 10 files
+app.post('/api/pengumuman', upload.array('files_pdf', 10), (req, res) => {
     const { judul, isi, tanggal } = req.body;
-    
-    // Convert filenames array to JSON string
     const files = req.files ? req.files.map(f => f.filename) : [];
     const filesJson = JSON.stringify(files); 
 
@@ -333,7 +330,6 @@ app.post('/api/pengumuman', upload.array('files_pdf', 10), (req, res) => { // Al
     });
 });
 
-// PUT Announcement (Updated for Multiple Files)
 app.put('/api/pengumuman/:id', upload.array('files_pdf', 10), (req, res) => {
     const { id } = req.params;
     const { judul, isi, tanggal } = req.body;
@@ -356,7 +352,7 @@ app.delete('/api/pengumuman/:id', (req, res) => {
     db.query("DELETE FROM pengumuman WHERE id = ?", [req.params.id], (err) => res.json({message: "Dihapus"}));
 });
 
-// SEARCH SCHOOL
+// --- SEARCH SCHOOL ---
 app.get('/api/search-school', async (req, res) => {
     const { query } = req.query; 
     if (!query || query.length < 3) return res.json([]); 
