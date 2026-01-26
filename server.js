@@ -77,29 +77,54 @@ const upload = multer({
     }
 });
 
+// ==========================================
+// 🔥 MIDDLEWARE / FUNGSI CEK STATUS 🔥
+// ==========================================
+// Fungsi helper untuk mengecek apakah pendaftaran buka/tutup sebelum memproses register
+const checkRegistrationOpen = (res, callback) => {
+    db.query("SELECT value FROM settings WHERE `key` = 'registration_status'", (err, results) => {
+        if (err) return res.status(500).json({ error: "Gagal mengecek status pendaftaran." });
+        
+        const status = results.length > 0 ? results[0].value : 'closed'; // Default closed jika tidak ada setting
+        
+        if (status === 'closed') {
+            return res.status(403).json({ message: "MOHON MAAF, PENDAFTARAN SUDAH DITUTUP." });
+        }
+        
+        // Jika open, lanjut ke fungsi callback (proses register)
+        callback();
+    });
+};
+
 // --- AUTHENTICATION ---
+
+// 1. REGISTER AKUN AWAL (Dibungkus checkRegistrationOpen)
 app.post('/api/auth/register', (req, res) => {
-    const { nik, username, email, password } = req.body;
-    if (!nik || !username || !email || !password) return res.status(400).json({ message: "Data tidak lengkap!" });
+    checkRegistrationOpen(res, () => {
+        // --- LOGIKA REGISTER ASLI ---
+        const { nik, username, email, password } = req.body;
+        if (!nik || !username || !email || !password) return res.status(400).json({ message: "Data tidak lengkap!" });
 
-    const checkSql = "SELECT * FROM users1 WHERE email = ? OR nik = ? OR username = ?";
-    db.query(checkSql, [email, nik, username], (err, results) => {
-        if (err) return res.status(500).json({ error: "Database error." });
-        if (results.length > 0) return res.status(400).json({ message: "Email, NIK, atau Username sudah terdaftar!" });
+        const checkSql = "SELECT * FROM users1 WHERE email = ? OR nik = ? OR username = ?";
+        db.query(checkSql, [email, nik, username], (err, results) => {
+            if (err) return res.status(500).json({ error: "Database error." });
+            if (results.length > 0) return res.status(400).json({ message: "Email, NIK, atau Username sudah terdaftar!" });
 
-        const sql1 = "INSERT INTO users1 (nik, username, email, password) VALUES (?, ?, ?, ?)";
-        db.query(sql1, [nik, username, email, password], (err, result1) => {
-            if (err) return res.status(500).json({ error: "Gagal membuat akun." });
+            const sql1 = "INSERT INTO users1 (nik, username, email, password) VALUES (?, ?, ?, ?)";
+            db.query(sql1, [nik, username, email, password], (err, result1) => {
+                if (err) return res.status(500).json({ error: "Gagal membuat akun." });
 
-            const sql2 = "INSERT INTO users (nik, username, email, status_pendaftaran) VALUES (?, ?, ?, 'Belum')";
-            db.query(sql2, [nik, username, email], (err) => {
-                if (err) console.error("Warning Insert users:", err.message);
-                res.status(200).json({ 
-                    message: "Registrasi Berhasil!",
-                    user: { id: result1.insertId, username, email, nik, role: 'user' }
+                const sql2 = "INSERT INTO users (nik, username, email, status_pendaftaran) VALUES (?, ?, ?, 'Belum')";
+                db.query(sql2, [nik, username, email], (err) => {
+                    if (err) console.error("Warning Insert users:", err.message);
+                    res.status(200).json({ 
+                        message: "Registrasi Berhasil!",
+                        user: { id: result1.insertId, username, email, nik, role: 'user' }
+                    });
                 });
             });
         });
+        // --- END LOGIKA REGISTER ASLI ---
     });
 });
 
@@ -184,7 +209,6 @@ app.get('/api/users/:id', (req, res) => {
             if (profiles.length > 0) {
                 res.json({ ...profiles[0], id: userAccount.id });
             } else {
-                // Return default data if profile doesn't exist yet
                 res.json({ 
                     id: userAccount.id, email: userAccount.email, username: userAccount.username, 
                     nama_lengkap: userAccount.username, status_pendaftaran: 'Belum', 
@@ -195,6 +219,7 @@ app.get('/api/users/:id', (req, res) => {
     });
 });
 
+// 2. INSERT FORMULIR BARU (Dibungkus checkRegistrationOpen jika INSERT baru)
 app.post('/api/register', upload.fields([
     { name: 'pasFoto', maxCount: 1 },
     { name: 'raport1', maxCount: 1 },
@@ -214,7 +239,9 @@ app.post('/api/register', upload.fields([
         if(err) return res.status(500).json({message: "Database Error", error: err});
 
         if(results.length > 0) {
-            // UPDATE DATA (Tanpa kolom bukti_pembayaran)
+            // JIKA UPDATE DATA -> BOLEH (Biasanya perbaikan berkas diperbolehkan meskipun pendaftaran tutup, 
+            // tapi jika Anda ingin menutup total edit juga, bungkus ini dengan checkRegistrationOpen)
+            
             let sql = `UPDATE users SET 
                 nama_lengkap=?, no_telepon=?, tanggal_lahir=?, tempat_lahir=?, jenis_kelamin=?, nik=?, nisn=?, agama=?, asal_sekolah=?, alamat_rumah=?,
                 nama_ayah=?, pekerjaan_ayah=?, nama_ibu=?, pekerjaan_ibu=?,
@@ -240,24 +267,26 @@ app.post('/api/register', upload.fields([
             });
 
         } else {
-            // INSERT DATA BARU (Tanpa kolom bukti_pembayaran)
-            const sql = `INSERT INTO users (
-                email, nama_lengkap, no_telepon, tanggal_lahir, tempat_lahir, jenis_kelamin, nik, nisn, agama, asal_sekolah, alamat_rumah,
-                nama_ayah, pekerjaan_ayah, nama_ibu, pekerjaan_ibu,
-                nilai_matematika, nilai_bhs_indonesia, nilai_ipa, nilai_bhs_inggris,
-                pas_foto, file_raport, file_sertifikat, status_pendaftaran
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Menunggu')`;
+            // JIKA INSERT DATA BARU -> HARUS CEK STATUS PENDAFTARAN
+            checkRegistrationOpen(res, () => {
+                const sql = `INSERT INTO users (
+                    email, nama_lengkap, no_telepon, tanggal_lahir, tempat_lahir, jenis_kelamin, nik, nisn, agama, asal_sekolah, alamat_rumah,
+                    nama_ayah, pekerjaan_ayah, nama_ibu, pekerjaan_ibu,
+                    nilai_matematika, nilai_bhs_indonesia, nilai_ipa, nilai_bhs_inggris,
+                    pas_foto, file_raport, file_sertifikat, status_pendaftaran
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Menunggu')`;
 
-            const params = [
-                email, namaLengkap, noTelp, tglLahir, tempatLahir, jenisKelamin, nik, nisn, agama, asalSekolah, alamatRumah,
-                namaAyah, pekerjaanAyah, namaIbu, pekerjaanIbu,
-                nilaiMatematika, nilaiBhsIndonesia, nilaiIpa, nilaiBhsInggris,
-                pasFoto, fileRaport, fileSertifikat
-            ];
+                const params = [
+                    email, namaLengkap, noTelp, tglLahir, tempatLahir, jenisKelamin, nik, nisn, agama, asalSekolah, alamatRumah,
+                    namaAyah, pekerjaanAyah, namaIbu, pekerjaanIbu,
+                    nilaiMatematika, nilaiBhsIndonesia, nilaiIpa, nilaiBhsInggris,
+                    pasFoto, fileRaport, fileSertifikat
+                ];
 
-            db.query(sql, params, (errInsert) => {
-                if (errInsert) return res.status(500).json({ message: "Gagal menyimpan data baru", error: errInsert });
-                res.status(200).json({ message: "Data Berhasil Disimpan" });
+                db.query(sql, params, (errInsert) => {
+                    if (errInsert) return res.status(500).json({ message: "Gagal menyimpan data baru", error: errInsert });
+                    res.status(200).json({ message: "Data Berhasil Disimpan" });
+                });
             });
         }
     });
@@ -280,7 +309,25 @@ app.put('/api/users/:id/status', (req, res) => {
     });
 });
 
-// --- PRESTASI ---
+// --- SETTINGS AKSES PENDAFTARAN ---
+app.get('/api/settings/registration-status', (req, res) => {
+    db.query("SELECT value FROM settings WHERE `key` = 'registration_status'", (err, results) => {
+        if (err) return res.status(500).json({ error: err.message });
+        const status = results.length > 0 ? results[0].value : 'closed';
+        res.json({ status });
+    });
+});
+
+app.put('/api/settings/registration-status', (req, res) => {
+    const { status } = req.body; 
+    const sql = "UPDATE settings SET value = ? WHERE `key` = 'registration_status'";
+    db.query(sql, [status], (err) => {
+        if (err) return res.status(500).json({ error: err.message });
+        res.json({ message: "Status pendaftaran diperbarui!" });
+    });
+});
+
+// --- PRESTASI, PENGUMUMAN, SEARCH ---
 app.get('/api/prestasi', (req, res) => {
     db.query("SELECT * FROM prestasi ORDER BY tanggal DESC", (err, results) => res.json(err ? [] : results));
 });
@@ -314,7 +361,6 @@ app.delete('/api/prestasi/:id', (req, res) => {
     db.query("DELETE FROM prestasi WHERE id = ?", [req.params.id], (err) => res.json({message: "Dihapus"}));
 });
 
-// --- PENGUMUMAN ---
 app.get('/api/pengumuman', (req, res) => {
     db.query("SELECT * FROM pengumuman ORDER BY tanggal DESC", (err, results) => res.json(err ? [] : results));
 });
@@ -352,7 +398,6 @@ app.delete('/api/pengumuman/:id', (req, res) => {
     db.query("DELETE FROM pengumuman WHERE id = ?", [req.params.id], (err) => res.json({message: "Dihapus"}));
 });
 
-// --- SEARCH SCHOOL ---
 app.get('/api/search-school', async (req, res) => {
     const { query } = req.query; 
     if (!query || query.length < 3) return res.json([]); 

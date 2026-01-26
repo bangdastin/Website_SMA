@@ -1,11 +1,31 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Menu, X, ArrowRight, GraduationCap, ChevronDown } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 
+const LOCAL_URL = "http://localhost:5000";
+const PROD_URL = "https://website-sma-y1ls-4vy3hvenx-bangdastins-projects.vercel.app";
+const API_BASE_URL = window.location.hostname === 'localhost' ? LOCAL_URL : PROD_URL; 
+
 const Navbar = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [isAboutDropdownOpen, setIsAboutDropdownOpen] = useState(false);
+  const [regStatus, setRegStatus] = useState('open'); // Default 'open' agar tidak layout shift drastis saat loading
   const navigate = useNavigate();
+
+  // --- CEK STATUS PENDAFTARAN ---
+  useEffect(() => {
+    const checkStatus = async () => {
+        try {
+            const res = await fetch(`${API_BASE_URL}/api/settings/registration-status`);
+            const data = await res.json();
+            if (data && data.status) {
+                setRegStatus(data.status);
+            }
+        } catch (err) {
+            console.error("Gagal mengambil status pendaftaran di Navbar:", err);
+        }
+    };
+    checkStatus();
+  }, []);
 
   return (
     <nav className="fixed w-full bg-white/90 backdrop-blur-md border-b border-slate-200 z-50 transition-all">
@@ -39,12 +59,13 @@ const Navbar = () => {
             <Link to="/pengumuman" className="px-4 py-2 text-slate-600 hover:text-blue-600 font-medium transition-colors">Pengumuman</Link>
           </div>
 
-          {/* CTA BUTTON (Desktop) */}
+          {/* CTA BUTTON (Desktop) - HANYA MUNCUL JIKA OPEN */}
           <div className="hidden md:flex">
-            {/* PENTING: Gunakan () => navigate(...) untuk mencegah infinite loop */}
-            <button onClick={() => navigate('/auth')} className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2.5 rounded-full font-bold shadow-lg shadow-blue-200 transition-all hover:scale-105 flex items-center gap-2">
-              Daftar Siswa Baru <ArrowRight size={18} />
-            </button>
+            {regStatus === 'open' && (
+                <button onClick={() => navigate('/auth')} className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2.5 rounded-full font-bold shadow-lg shadow-blue-200 transition-all hover:scale-105 flex items-center gap-2">
+                  Daftar Siswa Baru <ArrowRight size={18} />
+                </button>
+            )}
           </div>
 
           {/* MOBILE TOGGLE */}
@@ -65,11 +86,15 @@ const Navbar = () => {
             <Link to="/struktur" onClick={() => setIsMobileMenuOpen(false)} className="block w-full text-left px-3 py-3 text-slate-600 font-medium hover:bg-blue-50 rounded-lg">Struktur</Link>
             <Link to="/prestasi" onClick={() => setIsMobileMenuOpen(false)} className="block w-full text-left px-3 py-3 text-slate-600 font-medium hover:bg-blue-50 rounded-lg">Prestasi</Link>
             <Link to="/pengumuman" onClick={() => setIsMobileMenuOpen(false)} className="block w-full text-left px-3 py-3 text-slate-600 font-medium hover:bg-blue-50 rounded-lg">Pengumuman</Link>
-            <div className="pt-4 mt-4 border-t border-slate-100">
-              <button onClick={() => {navigate('/auth'); setIsMobileMenuOpen(false);}} className="w-full bg-blue-600 text-white px-4 py-3 rounded-xl font-bold flex justify-center items-center gap-2">
-                Daftar Sekarang <ArrowRight size={18} />
-              </button>
-            </div>
+            
+            {/* CTA BUTTON (Mobile) - HANYA MUNCUL JIKA OPEN */}
+            {regStatus === 'open' && (
+                <div className="pt-4 mt-4 border-t border-slate-100">
+                  <button onClick={() => {navigate('/auth'); setIsMobileMenuOpen(false);}} className="w-full bg-blue-600 text-white px-4 py-3 rounded-xl font-bold flex justify-center items-center gap-2">
+                    Daftar Sekarang <ArrowRight size={18} />
+                  </button>
+                </div>
+            )}
           </div>
         </div>
       )}

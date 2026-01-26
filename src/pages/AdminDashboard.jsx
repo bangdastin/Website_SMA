@@ -1,15 +1,126 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Users, LogOut, Bell, Search, School, RefreshCw, Loader2, Check, X, AlertTriangle, 
-  Trophy, Megaphone, Plus, Trash2, Calendar, Edit, FileText, Printer, Download, Eye, Phone
+  Trophy, Megaphone, Plus, Trash2, Calendar, Edit, FileText, Download, Eye, Phone, Lock, Unlock
 } from 'lucide-react';
 import Footer from '../Footer'; 
+
+// =================================================================
+// 1. CONFIGURATION & UTILITIES
+// =================================================================
 
 const LOCAL_URL = "http://localhost:5000";
 const PROD_URL = "https://website-sma-y1ls-4vy3hvenx-bangdastins-projects.vercel.app";
 const API_BASE_URL = window.location.hostname === 'localhost' ? LOCAL_URL : PROD_URL; 
 
-// --- REUSABLE ALERT ---
+/**
+ * Fungsi Helper untuk Generate HTML PDF Siswa
+ * Dipisahkan agar komponen utama lebih bersih
+ */
+const generateStudentPDF = (user) => {
+    const printWindow = window.open('', '', 'height=800,width=800');
+    
+    // Helper parse JSON aman
+    const parseNilai = (jsonStr) => { try { return JSON.parse(jsonStr) || {}; } catch (e) { return {}; } };
+    
+    const nilaiMtk = parseNilai(user.nilai_matematika);
+    const nilaiInd = parseNilai(user.nilai_bhs_indonesia);
+    const nilaiIpa = parseNilai(user.nilai_ipa);
+    const nilaiIng = parseNilai(user.nilai_bhs_inggris);
+
+    const htmlContent = `
+        <html>
+        <head>
+            <title>Formulir Pendaftaran - ${user.nama_lengkap}</title>
+            <style>
+                body { font-family: 'Times New Roman', serif; padding: 40px; color: #000; }
+                .header { text-align: center; border-bottom: 3px solid black; padding-bottom: 10px; margin-bottom: 20px; }
+                .header img { height: 80px; float: left; }
+                .header h3, .header h2, .header h1, .header p { margin: 2px; }
+                .title { text-align: center; font-weight: bold; margin-bottom: 20px; text-decoration: underline; font-size: 18px; }
+                .section { margin-bottom: 20px; }
+                .label { width: 180px; display: inline-block; font-weight: bold; }
+                table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 14px; }
+                th, td { border: 1px solid black; padding: 6px; text-align: center; }
+                .text-left { text-align: left; }
+                .photo-box { width: 113px; height: 151px; border: 1px solid black; display: flex; align-items: center; justify-content: center; background: #f0f0f0; }
+                .photo-box img { width: 100%; height: 100%; object-fit: cover; }
+                .print-btn { position: fixed; top: 20px; right: 20px; background: #2563eb; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; font-weight: bold; }
+                @media print { .print-btn { display: none; } }
+            </style>
+        </head>
+        <body>
+            <button class="print-btn" onclick="window.print()">🖨️ Cetak</button>
+            
+            <div class="header">
+                <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/b/ba/Coat_of_arms_of_North_Sumatra.svg/1200px-Coat_of_arms_of_North_Sumatra.svg.png" alt="Logo">
+                <h3>PEMERINTAH PROVINSI SUMATERA UTARA</h3>
+                <h2>DINAS PENDIDIKAN</h2>
+                <h1>SMA NEGERI 2 LINTONGNIHUTA</h1>
+                <p>Jalan Letjend. TB. Simatupang, Desa Siponjot</p>
+            </div>
+
+            <div class="title">FORMULIR PENDAFTARAN SISWA BARU</div>
+
+            <div class="section">
+                <p><strong>A. IDENTITAS PRIBADI</strong></p>
+                <div><span class="label">Nama Lengkap</span>: ${user.nama_lengkap || '-'}</div>
+                <div><span class="label">NISN</span>: ${user.nisn || '-'}</div>
+                <div><span class="label">NIK</span>: ${user.nik || '-'}</div>
+                <div><span class="label">TTL</span>: ${user.tempat_lahir || '-'}, ${user.tanggal_lahir ? new Date(user.tanggal_lahir).toLocaleDateString('id-ID') : '-'}</div>
+                <div><span class="label">Jenis Kelamin</span>: ${user.jenis_kelamin || '-'}</div>
+                <div><span class="label">Agama</span>: ${user.agama || '-'}</div>
+                <div><span class="label">Asal Sekolah</span>: ${user.asal_sekolah || '-'}</div>
+                <div><span class="label">Alamat</span>: ${user.alamat_rumah || '-'}</div>
+            </div>
+
+            <div class="section">
+                <p><strong>B. DATA ORANG TUA</strong></p>
+                <div><span class="label">Nama Ayah</span>: ${user.nama_ayah || '-'}</div>
+                <div><span class="label">Pekerjaan Ayah</span>: ${user.pekerjaan_ayah || '-'}</div>
+                <div><span class="label">Nama Ibu</span>: ${user.nama_ibu || '-'}</div>
+                <div><span class="label">Pekerjaan Ibu</span>: ${user.pekerjaan_ibu || '-'}</div>
+                <div><span class="label">No. Telepon</span>: ${user.no_telepon || '-'}</div>
+            </div>
+
+            <div class="section">
+                <p><strong>C. DATA NILAI RAPORT</strong></p>
+                <table>
+                    <thead><tr><th>Mata Pelajaran</th><th>Sem 1</th><th>Sem 2</th><th>Sem 3</th><th>Sem 4</th><th>Sem 5</th></tr></thead>
+                    <tbody>
+                        <tr><td class="text-left">Matematika</td><td>${nilaiMtk.sem1||'-'}</td><td>${nilaiMtk.sem2||'-'}</td><td>${nilaiMtk.sem3||'-'}</td><td>${nilaiMtk.sem4||'-'}</td><td>${nilaiMtk.sem5||'-'}</td></tr>
+                        <tr><td class="text-left">Bhs. Indonesia</td><td>${nilaiInd.sem1||'-'}</td><td>${nilaiInd.sem2||'-'}</td><td>${nilaiInd.sem3||'-'}</td><td>${nilaiInd.sem4||'-'}</td><td>${nilaiInd.sem5||'-'}</td></tr>
+                        <tr><td class="text-left">IPA</td><td>${nilaiIpa.sem1||'-'}</td><td>${nilaiIpa.sem2||'-'}</td><td>${nilaiIpa.sem3||'-'}</td><td>${nilaiIpa.sem4||'-'}</td><td>${nilaiIpa.sem5||'-'}</td></tr>
+                        <tr><td class="text-left">Bhs. Inggris</td><td>${nilaiIng.sem1||'-'}</td><td>${nilaiIng.sem2||'-'}</td><td>${nilaiIng.sem3||'-'}</td><td>${nilaiIng.sem4||'-'}</td><td>${nilaiIng.sem5||'-'}</td></tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="section" style="display: flex; justify-content: space-between; align-items: flex-end; margin-top: 40px;">
+                <div>
+                    <p><strong>Pas Foto:</strong></p>
+                    <div class="photo-box">
+                        ${user.pas_foto ? `<img src="${API_BASE_URL}/uploads/${user.pas_foto}" />` : 'Tidak Ada Foto'}
+                    </div>
+                </div>
+                <div style="text-align: center; margin-bottom: 20px;">
+                    <p>Lintongnihuta, ${new Date().toLocaleDateString('id-ID', {year: 'numeric', month: 'long', day: 'numeric'})}</p>
+                    <br><br><br>
+                    <p style="border-bottom: 1px solid black; display: inline-block; min-width: 200px;">(${user.nama_lengkap || '.......................'})</p>
+                    <p>Tanda Tangan Peserta</p>
+                </div>
+            </div>
+        </body>
+        </html>
+    `;
+    printWindow.document.write(htmlContent);
+    printWindow.document.close();
+};
+
+// =================================================================
+// 2. SUB-COMPONENTS (Alert, Managers, Sidebar, Header)
+// =================================================================
+
 const CustomAlert = ({ isOpen, type, title, message, onConfirm, onCancel, isLoading }) => {
   if (!isOpen) return null;
   const isConfirm = type === 'confirm';
@@ -37,7 +148,6 @@ const CustomAlert = ({ isOpen, type, title, message, onConfirm, onCancel, isLoad
   );
 };
 
-// --- COMPONENT: MANAGER PRESTASI ---
 const PrestasiManager = ({ showAlert }) => {
   const [dataList, setDataList] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -54,28 +164,16 @@ const PrestasiManager = ({ showAlert }) => {
     try {
       const res = await fetch(`${API_BASE_URL}/api/prestasi`);
       if (res.ok) setDataList(await res.json());
-    } catch (err) { console.error(err); } 
-    finally { setLoading(false); }
+    } catch (err) { console.error(err); } finally { setLoading(false); }
   };
 
   useEffect(() => { fetchData(); }, []);
-
-  const handleEdit = (item) => {
-    setFormData({ judul: item.judul, deskripsi: item.deskripsi, tanggal: item.tanggal.split('T')[0], penyelenggara: item.penyelenggara });
-    setEditId(item.id); setIsEditing(true); setShowForm(true); setImageFile(null);
-  };
-
-  const resetForm = () => {
-    setFormData({ judul: '', deskripsi: '', tanggal: '', penyelenggara: '' });
-    setImageFile(null); setIsEditing(false); setEditId(null); setShowForm(false);
-  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsSubmitting(true);
     const data = new FormData();
-    data.append('judul', formData.judul); data.append('deskripsi', formData.deskripsi);
-    data.append('tanggal', formData.tanggal); data.append('penyelenggara', formData.penyelenggara);
+    Object.keys(formData).forEach(key => data.append(key, formData[key]));
     if (imageFile) data.append('gambar', imageFile);
 
     try {
@@ -99,6 +197,16 @@ const PrestasiManager = ({ showAlert }) => {
     });
   };
 
+  const handleEdit = (item) => {
+    setFormData({ judul: item.judul, deskripsi: item.deskripsi, tanggal: item.tanggal.split('T')[0], penyelenggara: item.penyelenggara });
+    setEditId(item.id); setIsEditing(true); setShowForm(true); setImageFile(null);
+  };
+
+  const resetForm = () => {
+    setFormData({ judul: '', deskripsi: '', tanggal: '', penyelenggara: '' });
+    setImageFile(null); setIsEditing(false); setEditId(null); setShowForm(false);
+  };
+
   return (
     <div className="bg-white rounded-xl border border-slate-100 shadow-sm p-6">
       <div className="flex justify-between items-center mb-6">
@@ -107,6 +215,7 @@ const PrestasiManager = ({ showAlert }) => {
           {showForm ? <X size={18}/> : <Plus size={18}/>} {showForm ? 'Tutup Form' : 'Tambah'}
         </button>
       </div>
+
       {showForm && (
         <form onSubmit={handleSubmit} className="mb-8 bg-slate-50 p-6 rounded-xl border border-slate-200 animate-fade-in">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -122,6 +231,7 @@ const PrestasiManager = ({ showAlert }) => {
           </div>
         </form>
       )}
+
       <div className="overflow-x-auto">
         <table className="w-full text-left text-sm text-slate-600">
           <thead className="bg-yellow-50 text-yellow-800 font-bold uppercase text-xs">
@@ -147,7 +257,6 @@ const PrestasiManager = ({ showAlert }) => {
   );
 };
 
-// --- COMPONENT: MANAGER PENGUMUMAN ---
 const PengumumanManager = ({ showAlert }) => {
   const [dataList, setDataList] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -168,16 +277,6 @@ const PengumumanManager = ({ showAlert }) => {
 
   useEffect(() => { fetchData(); }, []);
 
-  const handleEdit = (item) => {
-    setFormData({ judul: item.judul, isi: item.isi, tanggal: item.tanggal.split('T')[0] });
-    setEditId(item.id); setIsEditing(true); setShowForm(true); setPdfFiles([]); 
-  };
-
-  const resetForm = () => {
-    setFormData({ judul: '', isi: '', tanggal: '' });
-    setPdfFiles([]); setIsEditing(false); setEditId(null); setShowForm(false);
-  };
-
   const handleFileChange = (e) => {
     const files = Array.from(e.target.files);
     const validFiles = [];
@@ -191,10 +290,7 @@ const PengumumanManager = ({ showAlert }) => {
       }
       validFiles.push(file);
     }
-
-    if (hasError) {
-        e.target.value = null; 
-    } 
+    if (hasError) e.target.value = null; 
     setPdfFiles(validFiles);
   };
 
@@ -203,11 +299,8 @@ const PengumumanManager = ({ showAlert }) => {
     setIsSubmitting(true);
     const data = new FormData();
     data.append('judul', formData.judul); data.append('isi', formData.isi); data.append('tanggal', formData.tanggal);
-    
     if (pdfFiles.length > 0) {
-        pdfFiles.forEach(file => {
-            data.append('files_pdf', file);
-        });
+        pdfFiles.forEach(file => data.append('files_pdf', file));
     }
 
     try {
@@ -231,15 +324,22 @@ const PengumumanManager = ({ showAlert }) => {
     });
   };
 
-  // --- PERBAIKAN DISINI (FIX ERROR NULL) ---
+  const handleEdit = (item) => {
+    setFormData({ judul: item.judul, isi: item.isi, tanggal: item.tanggal.split('T')[0] });
+    setEditId(item.id); setIsEditing(true); setShowForm(true); setPdfFiles([]); 
+  };
+
+  const resetForm = () => {
+    setFormData({ judul: '', isi: '', tanggal: '' });
+    setPdfFiles([]); setIsEditing(false); setEditId(null); setShowForm(false);
+  };
+
   const parseFiles = (fileString) => {
-      if (!fileString) return []; // Jika null/kosong, kembalikan array kosong
+      if (!fileString) return []; 
       try {
           const parsed = JSON.parse(fileString);
-          // Pastikan hasil parse adalah array, jika bukan (misal null), return []
           return Array.isArray(parsed) ? parsed : [];
       } catch (e) {
-          // Fallback untuk format lama (single string)
           return fileString ? [fileString] : [];
       }
   };
@@ -252,6 +352,7 @@ const PengumumanManager = ({ showAlert }) => {
           {showForm ? <X size={18}/> : <Plus size={18}/>} {showForm ? 'Tutup' : 'Tambah'}
         </button>
       </div>
+
       {showForm && (
         <form onSubmit={handleSubmit} className="mb-8 bg-slate-50 p-6 rounded-xl border border-slate-200 animate-fade-in">
           <div className="grid gap-4">
@@ -280,10 +381,11 @@ const PengumumanManager = ({ showAlert }) => {
           </div>
         </form>
       )}
+
       <div className="space-y-4">
         {loading ? <p className="text-center text-slate-400">Memuat data...</p> : dataList.length === 0 ? <p className="text-center text-slate-400">Belum ada pengumuman.</p> : 
           dataList.map(item => {
-            const files = parseFiles(item.file_pdf); // Sekarang aman dari error null
+            const files = parseFiles(item.file_pdf); 
             return (
             <div key={item.id} className="p-4 border border-slate-100 rounded-xl bg-slate-50 hover:border-blue-200 transition-colors flex justify-between items-start group">
                 <div className="flex-1 pr-4">
@@ -314,7 +416,6 @@ const PengumumanManager = ({ showAlert }) => {
   );
 };
 
-// --- SIDEBAR & HEADER ---
 const Sidebar = ({ isOpen, activeMenu, setActiveMenu, handleLogout }) => {
   const menus = [ { id: 'pendaftar', name: "Data Pendaftar", icon: Users }, { id: 'prestasi', name: "Prestasi", icon: Trophy }, { id: 'pengumuman', name: "Pengumuman", icon: Megaphone } ];
   return (
@@ -337,19 +438,35 @@ const Header = ({ searchTerm, setSearchTerm, userCount }) => (
 );
 
 // =================================================================
-// MAIN COMPONENT: ADMIN DASHBOARD
+// 3. MAIN DASHBOARD COMPONENT
 // =================================================================
+
 const AdminDashboard = () => {
   const [activeMenu, setActiveMenu] = useState('pendaftar'); 
   const [pendaftar, setPendaftar] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  
+  // State: Access Control
+  const [regStatus, setRegStatus] = useState('open'); 
+  const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
+
+  // State: Alert
   const [alertState, setAlertState] = useState({ isOpen: false, type: '', title: '', message: '', onConfirm: null });
 
   const showAlert = (type, title, message, onConfirm = null) => {
     setAlertState({ isOpen: true, type, title, message, onConfirm: () => { if(onConfirm) onConfirm(); setAlertState(prev => ({...prev, isOpen: false})); }});
   };
   const closeAlert = () => setAlertState(prev => ({...prev, isOpen: false}));
+
+  // --- API CALLS ---
+  const fetchRegStatus = async () => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/settings/registration-status`);
+      const data = await res.json();
+      setRegStatus(data.status);
+    } catch (err) { console.error("Gagal ambil status pendaftaran:", err); }
+  };
 
   const fetchPendaftar = async () => {
     setLoading(true);
@@ -359,7 +476,34 @@ const AdminDashboard = () => {
     } catch (err) { console.error(err); } finally { setLoading(false); }
   };
 
-  useEffect(() => { if(activeMenu === 'pendaftar') fetchPendaftar(); }, [activeMenu]);
+  useEffect(() => { 
+    if(activeMenu === 'pendaftar') {
+        fetchPendaftar();
+        fetchRegStatus(); 
+    } 
+  }, [activeMenu]);
+
+  // --- HANDLERS ---
+  const handleToggleRegistration = (currentStatus) => {
+    const nextStatus = currentStatus === 'open' ? 'closed' : 'open';
+    const actionText = nextStatus === 'open' ? 'MEMBUKA' : 'MENUTUP';
+    
+    showAlert('confirm', 'Ubah Akses Pendaftaran?', `Anda akan ${actionText} akses pendaftaran bagi calon siswa baru.`, async () => {
+      setIsUpdatingStatus(true);
+      try {
+        const res = await fetch(`${API_BASE_URL}/api/settings/registration-status`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status: nextStatus }),
+        });
+        if (res.ok) {
+          setRegStatus(nextStatus);
+          showAlert('success', 'Berhasil', `Pendaftaran kini telah ${nextStatus === 'open' ? 'Dibuka' : 'Ditutup'}.`);
+        }
+      } catch (err) { showAlert('error', 'Error', "Gagal menghubungi server"); }
+      finally { setIsUpdatingStatus(false); }
+    });
+  };
 
   const handleStatusChange = (user, status) => {
     showAlert('confirm', 'Konfirmasi', `Ubah status ${user.nama_lengkap} menjadi ${status}?`, async () => {
@@ -375,166 +519,54 @@ const AdminDashboard = () => {
     });
   };
 
-  // --- GENERATE VIEW WINDOW (VIEW ONLY - CLIENT SIDE HTML) ---
-  const handleViewPDF = (user) => {
-    const printWindow = window.open('', '', 'height=800,width=800');
-    
-    // Parse JSON Values
-    const parseNilai = (jsonStr) => {
-        try { return JSON.parse(jsonStr) || {}; } 
-        catch (e) { return {}; }
-    };
-    const nilaiMtk = parseNilai(user.nilai_matematika);
-    const nilaiInd = parseNilai(user.nilai_bhs_indonesia);
-    const nilaiIpa = parseNilai(user.nilai_ipa);
-    const nilaiIng = parseNilai(user.nilai_bhs_inggris);
-
-    const htmlContent = `
-        <html>
-        <head>
-            <title>Formulir Pendaftaran - ${user.nama_lengkap}</title>
-            <style>
-                body { font-family: 'Times New Roman', serif; padding: 40px; }
-                .header { text-align: center; border-bottom: 3px solid black; padding-bottom: 10px; margin-bottom: 20px; }
-                .header img { height: 80px; float: left; }
-                .header h3, .header h2, .header h1, .header p { margin: 2px; }
-                .title { text-align: center; font-weight: bold; margin-bottom: 20px; text-decoration: underline; }
-                .section { margin-bottom: 15px; }
-                .label { width: 180px; display: inline-block; font-weight: bold; }
-                table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-                th, td { border: 1px solid black; padding: 5px; text-align: center; }
-                .photo-box { width: 113px; height: 151px; border: 1px solid black; display: flex; align-items: center; justify-content: center; margin-top: 20px; }
-                .photo-box img { width: 100%; height: 100%; object-fit: cover; }
-                .print-btn { 
-                    position: fixed; top: 20px; right: 20px; 
-                    background: #2563eb; color: white; border: none; padding: 10px 20px; 
-                    border-radius: 5px; cursor: pointer; font-family: sans-serif; font-weight: bold;
-                    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
-                }
-                .print-btn:hover { background: #1d4ed8; }
-                @media print { .print-btn { display: none; } }
-                a { color: blue; text-decoration: underline; }
-            </style>
-        </head>
-        <body>
-            <button class="print-btn" onclick="window.print()">🖨️ Cetak Halaman Ini</button>
-
-            <div class="header">
-                <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/b/ba/Coat_of_arms_of_North_Sumatra.svg/1200px-Coat_of_arms_of_North_Sumatra.svg.png" alt="Logo">
-                <h3>PEMERINTAH PROVINSI SUMATERA UTARA</h3>
-                <h2>DINAS PENDIDIKAN</h2>
-                <h1>SMA NEGERI 2 LINTONGNIHUTA</h1>
-                <p>Jalan Letjend. TB. Simatupang, Desa Siponjot</p>
-            </div>
-
-            <div class="title">FORMULIR PENDAFTARAN SISWA BARU</div>
-
-            <div class="section">
-                <p><strong>A. IDENTITAS PRIBADI</strong></p>
-                <div><span class="label">Nama Lengkap</span>: ${user.nama_lengkap || '-'}</div>
-                <div><span class="label">NISN</span>: ${user.nisn || '-'}</div>
-                <div><span class="label">NIK</span>: ${user.nik || '-'}</div>
-                <div><span class="label">Tempat, Tgl Lahir</span>: ${user.tempat_lahir || '-'}, ${user.tanggal_lahir ? new Date(user.tanggal_lahir).toLocaleDateString('id-ID') : '-'}</div>
-                <div><span class="label">Jenis Kelamin</span>: ${user.jenis_kelamin || '-'}</div>
-                <div><span class="label">Agama</span>: ${user.agama || '-'}</div>
-                <div><span class="label">Asal Sekolah</span>: ${user.asal_sekolah || '-'}</div>
-                <div><span class="label">Alamat</span>: ${user.alamat_rumah || '-'}</div>
-            </div>
-
-            <div class="section">
-                <p><strong>B. DATA ORANG TUA</strong></p>
-                <div><span class="label">Nama Ayah</span>: ${user.nama_ayah || '-'}</div>
-                <div><span class="label">Pekerjaan Ayah</span>: ${user.pekerjaan_ayah || '-'}</div>
-                <div><span class="label">Nama Ibu</span>: ${user.nama_ibu || '-'}</div>
-                <div><span class="label">Pekerjaan Ibu</span>: ${user.pekerjaan_ibu || '-'}</div>
-                <div><span class="label">No. Telepon</span>: ${user.no_telepon || '-'}</div>
-            </div>
-
-            <div class="section">
-                <p><strong>C. DATA NILAI RAPORT</strong></p>
-                <table>
-                    <thead>
-                        <tr><th>Mata Pelajaran</th><th>Sem 1</th><th>Sem 2</th><th>Sem 3</th><th>Sem 4</th><th>Sem 5</th></tr>
-                    </thead>
-                    <tbody>
-                        <tr><td style="text-align:left">Matematika</td><td>${nilaiMtk.sem1||'-'}</td><td>${nilaiMtk.sem2||'-'}</td><td>${nilaiMtk.sem3||'-'}</td><td>${nilaiMtk.sem4||'-'}</td><td>${nilaiMtk.sem5||'-'}</td></tr>
-                        <tr><td style="text-align:left">Bhs. Indonesia</td><td>${nilaiInd.sem1||'-'}</td><td>${nilaiInd.sem2||'-'}</td><td>${nilaiInd.sem3||'-'}</td><td>${nilaiInd.sem4||'-'}</td><td>${nilaiInd.sem5||'-'}</td></tr>
-                        <tr><td style="text-align:left">IPA</td><td>${nilaiIpa.sem1||'-'}</td><td>${nilaiIpa.sem2||'-'}</td><td>${nilaiIpa.sem3||'-'}</td><td>${nilaiIpa.sem4||'-'}</td><td>${nilaiIpa.sem5||'-'}</td></tr>
-                        <tr><td style="text-align:left">Bhs. Inggris</td><td>${nilaiIng.sem1||'-'}</td><td>${nilaiIng.sem2||'-'}</td><td>${nilaiIng.sem3||'-'}</td><td>${nilaiIng.sem4||'-'}</td><td>${nilaiIng.sem5||'-'}</td></tr>
-                    </tbody>
-                </table>
-            </div>
-
-            <div class="section">
-                <p><strong>D. DOKUMEN PENDUKUNG</strong></p>
-                <table>
-                    <thead>
-                        <tr><th>No</th><th>Jenis Dokumen</th><th>Status</th><th>Keterangan</th></tr>
-                    </thead>
-                    <tbody>
-                        <tr>
-                            <td>1</td>
-                            <td style="text-align:left">Raport Semester 1-5</td>
-                            <td>${user.file_raport ? '&#10003; Ada' : '&#10007; Tidak'}</td>
-                            <td style="text-align:left">
-                                ${user.file_raport 
-                                    ? `<a href="${API_BASE_URL}/uploads/${user.file_raport}" target="_blank">Lihat PDF</a>` 
-                                    : '-'}
-                            </td>
-                        </tr>
-                        <tr>
-                            <td>2</td>
-                            <td style="text-align:left">Sertifikat Pendukung</td>
-                            <td>${user.file_sertifikat ? '&#10003; Ada' : '&#10007; Tidak'}</td>
-                            <td style="text-align:left">
-                                ${user.file_sertifikat 
-                                    ? `<a href="${API_BASE_URL}/uploads/${user.file_sertifikat}" target="_blank">Lihat PDF</a>` 
-                                    : '-'}
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
-
-            <div style="display: flex; justify-content: space-between; margin-top: 30px;">
-                <div>
-                    <p>Pas Foto:</p>
-                    <div class="photo-box">
-                        ${user.pas_foto ? `<img src="${API_BASE_URL}/uploads/${user.pas_foto}" />` : 'Tidak Ada Foto'}
-                    </div>
-                </div>
-                <div style="text-align: center; margin-top: 20px;">
-                    <p>Lintongnihuta, ${new Date().toLocaleDateString('id-ID', {year: 'numeric', month: 'long', day: 'numeric'})}</p>
-                    <br><br><br>
-                    <p>(${user.nama_lengkap || '.......................'})</p>
-                    <p>Tanda Tangan Peserta</p>
-                </div>
-            </div>
-        </body>
-        </html>
-    `;
-    printWindow.document.write(htmlContent);
-    printWindow.document.close();
-  };
-
   const filteredPendaftar = pendaftar.filter(item => {
     const term = searchTerm.toLowerCase();
     return (item.nama_lengkap || '').toLowerCase().includes(term) || (item.asal_sekolah || '').toLowerCase().includes(term);
   });
 
+  // --- RENDER ---
   return (
     <div className="min-h-screen bg-slate-50 font-sans flex text-slate-800">
       <CustomAlert {...alertState} onCancel={closeAlert} />
+      
       <Sidebar isOpen={true} activeMenu={activeMenu} setActiveMenu={setActiveMenu} handleLogout={() => { localStorage.removeItem('userApp'); window.location.href='/'; }} />
+      
       <main className="flex-1 flex flex-col md:ml-64 transition-all">
         <Header searchTerm={searchTerm} setSearchTerm={setSearchTerm} userCount={pendaftar.length} />
+        
         <div className="p-8 flex-1">
+          {/* MENU 1: DATA PENDAFTAR */}
           {activeMenu === 'pendaftar' && (
             <>
-                <div className="mb-8 flex justify-between items-center">
-                    <div><h1 className="text-2xl font-bold text-slate-800">Data Pendaftar</h1><p className="text-slate-500">Total: <span className="font-bold text-blue-600">{pendaftar.length}</span> Siswa</p></div>
-                    <button onClick={fetchPendaftar} className="bg-white border hover:bg-slate-50 px-4 py-2 rounded-lg flex items-center gap-2"><RefreshCw size={16} /> Refresh</button>
+                <div className="mb-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                    <div>
+                        <h1 className="text-2xl font-bold text-slate-800">Data Pendaftar</h1>
+                        <p className="text-slate-500">Total: <span className="font-bold text-blue-600">{pendaftar.length}</span> Siswa</p>
+                    </div>
+
+                    {/* KARTU KONTROL AKSES PENDAFTARAN */}
+                    <div className="bg-white border rounded-xl p-3 shadow-sm flex items-center gap-4">
+                        <div className={`p-2 rounded-lg ${regStatus === 'open' ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'}`}>
+                            {regStatus === 'open' ? <Unlock size={20} /> : <Lock size={20} />}
+                        </div>
+                        <div>
+                            <p className="text-[10px] uppercase font-bold text-slate-400 leading-tight">Status Pendaftaran</p>
+                            <p className={`text-sm font-bold ${regStatus === 'open' ? 'text-green-600' : 'text-red-600'}`}>
+                                {regStatus === 'open' ? 'DIBUKA' : 'DITUTUP'}
+                            </p>
+                        </div>
+                        <button 
+                            disabled={isUpdatingStatus}
+                            onClick={() => handleToggleRegistration(regStatus)}
+                            className={`ml-4 px-4 py-1.5 rounded-lg text-xs font-bold transition-all active:scale-95 flex items-center gap-2 ${regStatus === 'open' ? 'bg-red-50 text-red-600 hover:bg-red-100' : 'bg-green-50 text-green-600 hover:bg-green-100'}`}
+                        >
+                            {isUpdatingStatus ? <Loader2 size={14} className="animate-spin" /> : (regStatus === 'open' ? 'Tutup Pendaftaran' : 'Buka Pendaftaran')}
+                        </button>
+                    </div>
+
+                    <button onClick={fetchPendaftar} className="bg-white border hover:bg-slate-50 px-4 py-2 rounded-lg flex items-center gap-2 text-sm"><RefreshCw size={16} /> Refresh</button>
                 </div>
+
                 <div className="bg-white rounded-xl border shadow-sm overflow-hidden">
                     <div className="overflow-x-auto">
                     <table className="w-full text-left text-sm text-slate-600">
@@ -554,17 +586,11 @@ const AdminDashboard = () => {
                                 <td className="p-4">{i + 1}</td>
                                 <td className="p-4 font-bold">{item.nama_lengkap || item.username}<div className="text-xs font-normal text-slate-400 flex items-center gap-1"><Phone size={10}/> {item.no_telepon || '-'}</div></td>
                                 <td className="p-4">{item.asal_sekolah || '-'}</td>
-                                
                                 <td className="p-4 text-center">
-                                    <button 
-                                        onClick={() => handleViewPDF(item)}
-                                        className="inline-flex items-center gap-2 bg-blue-50 text-blue-600 hover:bg-blue-100 px-3 py-1.5 rounded-lg border border-blue-100 transition-colors text-xs font-bold"
-                                        title="Lihat Formulir Lengkap"
-                                    >
+                                    <button onClick={() => generateStudentPDF(item)} className="inline-flex items-center gap-2 bg-blue-50 text-blue-600 hover:bg-blue-100 px-3 py-1.5 rounded-lg border border-blue-100 transition-colors text-xs font-bold" title="Lihat Formulir Lengkap">
                                         <Eye size={14} /> Lihat Formulir
                                     </button>
                                 </td>
-
                                 <td className="p-4 text-center"><span className={`px-2 py-1 rounded-full text-xs border ${item.status_pendaftaran === 'Diterima' ? 'bg-green-50 text-green-700 border-green-200' : item.status_pendaftaran === 'Ditolak' ? 'bg-red-50 text-red-700 border-red-200' : 'bg-yellow-50 text-yellow-700 border-yellow-200'}`}>{item.status_pendaftaran || 'Menunggu'}</span></td>
                                 <td className="p-4 text-center flex justify-center gap-2">
                                     <button onClick={() => handleStatusChange(item, 'Diterima')} className="p-1.5 bg-green-100 text-green-600 rounded hover:bg-green-200" title="Terima"><Check size={16}/></button>
@@ -578,9 +604,14 @@ const AdminDashboard = () => {
                 </div>
             </>
           )}
+
+          {/* MENU 2: PRESTASI */}
           {activeMenu === 'prestasi' && <PrestasiManager showAlert={showAlert} />}
+
+          {/* MENU 3: PENGUMUMAN */}
           {activeMenu === 'pengumuman' && <PengumumanManager showAlert={showAlert} />}
         </div>
+        
         <Footer />
       </main>
     </div>
