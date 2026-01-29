@@ -8,16 +8,21 @@ import { useNavigate } from 'react-router-dom';
 import RegistrationForm from '../components/RegistrationForm'; 
 
 // DEFINISI URL SERVER
-const LOCAL_URL = "http://localhost:5000";
 const PROD_URL = "https://website-sma-y1ls-4vy3hvenx-bangdastins-projects.vercel.app";
-const API_BASE_URL = window.location.hostname === 'localhost' ? LOCAL_URL : PROD_URL; 
+const hostname = window.location.hostname;
+export const API_BASE_URL = (hostname === 'localhost') 
+  ? "http://localhost:5000" 
+  : (hostname.includes('vercel.app')) 
+    ? PROD_URL 
+    : `http://${hostname}:5000`;
 
+    
 // --- 1. SIDEBAR COMPONENT ---
 const Sidebar = ({ isOpen, activeMenu, onMenuClick, onLogout }) => {
   const menus = [
     { name: "Home", id: "home", icon: Home },
     { name: "Pendaftaran", id: "pendaftaran", icon: UserPlus },
-    { name: "Kartu Ujian", id: "kartu", icon: FileBadge }, 
+    { name: "Kartu Pendaftaran", id: "kartu", icon: FileBadge }, 
   ];
 
   return (
@@ -52,7 +57,7 @@ const ExamCardView = ({ userData }) => {
                 <h2 className="text-2xl font-bold text-slate-800 mb-2">Kartu Belum Tersedia</h2>
                 <p className="text-slate-500 max-w-md">
                     Status Anda saat ini: <span className="font-bold text-blue-600">{userData.status || 'Belum Mendaftar'}</span>. <br/>
-                    Kartu ujian hanya dapat dicetak setelah status menjadi <span className="font-bold text-green-600">DITERIMA</span>.
+                    Kartu Pendaftaran hanya dapat dicetak setelah status menjadi <span className="font-bold text-green-600">DITERIMA</span>.
                 </p>
             </div>
         );
@@ -178,7 +183,7 @@ const DashboardContent = ({ onRegisterClick, userData, onRefresh }) => {
               <h4 className="font-bold mb-1 text-slate-800">Halo, {userData.nama_lengkap || userData.username}!</h4>
               {!userData.status && <p className="text-sm text-slate-600">Anda belum melakukan pendaftaran. Silakan klik tombol di bawah untuk mengisi formulir.</p>}
               {userData.status === 'Menunggu' && <div><p className="text-sm font-bold mb-1 text-blue-700">Formulir Terkirim.</p><p className="text-sm text-slate-600">Data Anda sudah masuk dan sedang diverifikasi oleh panitia.</p></div>}
-              {userData.status === 'Diterima' && <p className="text-sm text-green-700">Selamat! Pendaftaran Anda <strong>DITERIMA</strong>. Silakan unduh Kartu Ujian Anda pada menu di samping.</p>}
+              {userData.status === 'Diterima' && <p className="text-sm text-green-700">Selamat! Pendaftaran Anda <strong>DITERIMA</strong>. Silakan unduh Kartu Pendaftar Anda pada menu di samping.</p>}
               {userData.status === 'Ditolak' && <div><p className="text-sm font-bold text-red-700 mb-1">Mohon Maaf, Pendaftaran Ditolak.</p><p className="text-sm text-red-600">Silakan perbaiki data pada formulir.</p></div>}
           </div>
       </div>

@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
+import * as XLSX from 'xlsx'; // Import Library Excel
 import { 
   Users, LogOut, Bell, Search, School, RefreshCw, Loader2, Check, X, AlertTriangle, 
-  Trophy, Megaphone, Plus, Trash2, Calendar, Edit, FileText, Download, Eye, Phone, Lock, Unlock
+  Trophy, Megaphone, Plus, Trash2, Calendar, Edit, FileText, Download, Eye, Phone, Lock, Unlock,
+  FileSpreadsheet 
 } from 'lucide-react';
 import Footer from '../Footer'; 
 
@@ -9,24 +11,32 @@ import Footer from '../Footer';
 // 1. CONFIGURATION & UTILITIES
 // =================================================================
 
-const LOCAL_URL = "http://localhost:5000";
 const PROD_URL = "https://website-sma-y1ls-4vy3hvenx-bangdastins-projects.vercel.app";
-const API_BASE_URL = window.location.hostname === 'localhost' ? LOCAL_URL : PROD_URL; 
-
+const hostname = window.location.hostname;
+export const API_BASE_URL = (hostname === 'localhost') 
+  ? "http://localhost:5000" 
+  : (hostname.includes('vercel.app')) 
+    ? PROD_URL 
+    : `http://${hostname}:5000`;
+    
 /**
  * Fungsi Helper untuk Generate HTML PDF Siswa
- * Dipisahkan agar komponen utama lebih bersih
  */
 const generateStudentPDF = (user) => {
     const printWindow = window.open('', '', 'height=800,width=800');
     
-    // Helper parse JSON aman
     const parseNilai = (jsonStr) => { try { return JSON.parse(jsonStr) || {}; } catch (e) { return {}; } };
     
     const nilaiMtk = parseNilai(user.nilai_matematika);
     const nilaiInd = parseNilai(user.nilai_bhs_indonesia);
     const nilaiIpa = parseNilai(user.nilai_ipa);
     const nilaiIng = parseNilai(user.nilai_bhs_inggris);
+
+    const fileRaport = user.raport1 || user.file_raport || null;
+    const fileSertifikat = user.sertifikat1 || user.file_sertifikat || null;
+
+    const linkRaport = fileRaport ? `${API_BASE_URL}/uploads/${fileRaport}` : null;
+    const linkSertifikat = fileSertifikat ? `${API_BASE_URL}/uploads/${fileSertifikat}` : null;
 
     const htmlContent = `
         <html>
@@ -45,13 +55,18 @@ const generateStudentPDF = (user) => {
                 .text-left { text-align: left; }
                 .photo-box { width: 113px; height: 151px; border: 1px solid black; display: flex; align-items: center; justify-content: center; background: #f0f0f0; }
                 .photo-box img { width: 100%; height: 100%; object-fit: cover; }
-                .print-btn { position: fixed; top: 20px; right: 20px; background: #2563eb; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; font-weight: bold; }
-                @media print { .print-btn { display: none; } }
+                .print-btn { position: fixed; top: 20px; right: 20px; background: #2563eb; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; font-weight: bold; z-index: 999; }
+                .file-link { color: blue; text-decoration: underline; font-weight: bold; cursor: pointer; }
+
+                @media print { 
+                    .print-btn { display: none; } 
+                    .file-link { text-decoration: none; color: black; pointer-events: none; }
+                    .file-link::after { content: " (File Tersimpan di Server)"; font-size: 11px; color: #555; }
+                }
             </style>
         </head>
         <body>
-            <button class="print-btn" onclick="window.print()">🖨️ Cetak</button>
-            
+            <button class="print-btn" onclick="window.print()">🖨️ Cetak Formulir</button>
             <div class="header">
                 <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/b/ba/Coat_of_arms_of_North_Sumatra.svg/1200px-Coat_of_arms_of_North_Sumatra.svg.png" alt="Logo">
                 <h3>PEMERINTAH PROVINSI SUMATERA UTARA</h3>
@@ -59,9 +74,7 @@ const generateStudentPDF = (user) => {
                 <h1>SMA NEGERI 2 LINTONGNIHUTA</h1>
                 <p>Jalan Letjend. TB. Simatupang, Desa Siponjot</p>
             </div>
-
             <div class="title">FORMULIR PENDAFTARAN SISWA BARU</div>
-
             <div class="section">
                 <p><strong>A. IDENTITAS PRIBADI</strong></p>
                 <div><span class="label">Nama Lengkap</span>: ${user.nama_lengkap || '-'}</div>
@@ -73,7 +86,6 @@ const generateStudentPDF = (user) => {
                 <div><span class="label">Asal Sekolah</span>: ${user.asal_sekolah || '-'}</div>
                 <div><span class="label">Alamat</span>: ${user.alamat_rumah || '-'}</div>
             </div>
-
             <div class="section">
                 <p><strong>B. DATA ORANG TUA</strong></p>
                 <div><span class="label">Nama Ayah</span>: ${user.nama_ayah || '-'}</div>
@@ -82,7 +94,6 @@ const generateStudentPDF = (user) => {
                 <div><span class="label">Pekerjaan Ibu</span>: ${user.pekerjaan_ibu || '-'}</div>
                 <div><span class="label">No. Telepon</span>: ${user.no_telepon || '-'}</div>
             </div>
-
             <div class="section">
                 <p><strong>C. DATA NILAI RAPORT</strong></p>
                 <table>
@@ -95,7 +106,21 @@ const generateStudentPDF = (user) => {
                     </tbody>
                 </table>
             </div>
-
+             <div class="section">
+                <p><strong>D. LAMPIRAN DOKUMEN (PDF)</strong></p>
+                <table style="border: none; margin-top:0;">
+                     <tr style="border: none;">
+                        <td style="border: 1px solid #000; text-align: left; padding: 10px; width: 50%;">
+                            <strong>1. File Raport (Semester 1-5)</strong><br/><br/>
+                            ${linkRaport ? `<a href="${linkRaport}" target="_blank" class="file-link">📄 Buka/Download File Raport</a>` : '<span style="color: red; font-style: italic;">Tidak ada file diupload</span>'}
+                        </td>
+                        <td style="border: 1px solid #000; text-align: left; padding: 10px; width: 50%;">
+                            <strong>2. Sertifikat Pendukung</strong><br/><br/>
+                             ${linkSertifikat ? `<a href="${linkSertifikat}" target="_blank" class="file-link">📄 Buka/Download Sertifikat</a>` : '<span style="color: gray; font-style: italic;">Tidak ada sertifikat</span>'}
+                        </td>
+                     </tr>
+                </table>
+            </div>
             <div class="section" style="display: flex; justify-content: space-between; align-items: flex-end; margin-top: 40px;">
                 <div>
                     <p><strong>Pas Foto:</strong></p>
@@ -118,7 +143,7 @@ const generateStudentPDF = (user) => {
 };
 
 // =================================================================
-// 2. SUB-COMPONENTS (Alert, Managers, Sidebar, Header)
+// 2. SUB-COMPONENTS
 // =================================================================
 
 const CustomAlert = ({ isOpen, type, title, message, onConfirm, onCancel, isLoading }) => {
@@ -126,7 +151,6 @@ const CustomAlert = ({ isOpen, type, title, message, onConfirm, onCancel, isLoad
   const isConfirm = type === 'confirm';
   const isSuccess = type === 'success';
   const isError = type === 'error';
-
   return (
     <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 backdrop-blur-sm animate-fade-in">
       <div className="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-sm mx-4">
@@ -136,9 +160,7 @@ const CustomAlert = ({ isOpen, type, title, message, onConfirm, onCancel, isLoad
         <h3 className="text-xl font-bold text-slate-800 text-center mb-2">{title}</h3>
         <p className="text-slate-500 text-center text-sm mb-6">{message}</p>
         <div className="flex gap-3">
-          {isConfirm && (
-            <button onClick={onCancel} disabled={isLoading} className="flex-1 py-2.5 rounded-xl border border-slate-200 text-slate-600 font-medium hover:bg-slate-50 transition-colors">Batal</button>
-          )}
+          {isConfirm && (<button onClick={onCancel} disabled={isLoading} className="flex-1 py-2.5 rounded-xl border border-slate-200 text-slate-600 font-medium hover:bg-slate-50 transition-colors">Batal</button>)}
           <button onClick={onConfirm} disabled={isLoading} className={`flex-1 py-2.5 rounded-xl text-white font-medium shadow-lg transition-all active:scale-95 flex items-center justify-center gap-2 ${isSuccess ? 'bg-green-600 hover:bg-green-700' : isError ? 'bg-red-600 hover:bg-red-700' : 'bg-blue-600 hover:bg-blue-700'}`}>
             {isLoading ? <Loader2 size={18} className="animate-spin" /> : (isConfirm ? 'Ya, Lanjutkan' : 'Tutup')}
           </button>
@@ -154,7 +176,6 @@ const PrestasiManager = ({ showAlert }) => {
   const [showForm, setShowForm] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [editId, setEditId] = useState(null);
-  
   const [formData, setFormData] = useState({ judul: '', deskripsi: '', tanggal: '', penyelenggara: '' });
   const [imageFile, setImageFile] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -215,7 +236,6 @@ const PrestasiManager = ({ showAlert }) => {
           {showForm ? <X size={18}/> : <Plus size={18}/>} {showForm ? 'Tutup Form' : 'Tambah'}
         </button>
       </div>
-
       {showForm && (
         <form onSubmit={handleSubmit} className="mb-8 bg-slate-50 p-6 rounded-xl border border-slate-200 animate-fade-in">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -231,7 +251,6 @@ const PrestasiManager = ({ showAlert }) => {
           </div>
         </form>
       )}
-
       <div className="overflow-x-auto">
         <table className="w-full text-left text-sm text-slate-600">
           <thead className="bg-yellow-50 text-yellow-800 font-bold uppercase text-xs">
@@ -281,7 +300,6 @@ const PengumumanManager = ({ showAlert }) => {
     const files = Array.from(e.target.files);
     const validFiles = [];
     let hasError = false;
-
     for (let file of files) {
       if (file.size > 2 * 1024 * 1024) { 
          showAlert('error', 'File Terlalu Besar', `File ${file.name} melebihi 2MB.`);
@@ -302,7 +320,6 @@ const PengumumanManager = ({ showAlert }) => {
     if (pdfFiles.length > 0) {
         pdfFiles.forEach(file => data.append('files_pdf', file));
     }
-
     try {
       let url = isEditing ? `${API_BASE_URL}/api/pengumuman/${editId}` : `${API_BASE_URL}/api/pengumuman`;
       let method = isEditing ? 'PUT' : 'POST';
@@ -352,7 +369,6 @@ const PengumumanManager = ({ showAlert }) => {
           {showForm ? <X size={18}/> : <Plus size={18}/>} {showForm ? 'Tutup' : 'Tambah'}
         </button>
       </div>
-
       {showForm && (
         <form onSubmit={handleSubmit} className="mb-8 bg-slate-50 p-6 rounded-xl border border-slate-200 animate-fade-in">
           <div className="grid gap-4">
@@ -381,7 +397,6 @@ const PengumumanManager = ({ showAlert }) => {
           </div>
         </form>
       )}
-
       <div className="space-y-4">
         {loading ? <p className="text-center text-slate-400">Memuat data...</p> : dataList.length === 0 ? <p className="text-center text-slate-400">Belum ada pengumuman.</p> : 
           dataList.map(item => {
@@ -484,6 +499,58 @@ const AdminDashboard = () => {
   }, [activeMenu]);
 
   // --- HANDLERS ---
+  
+  // Fungsi Export to Excel (.xlsx) - STATUS DIHAPUS
+  const downloadExcel = () => {
+    const parseNilai = (jsonStr) => { try { return JSON.parse(jsonStr) || {}; } catch (e) { return {}; } };
+    
+    // Siapkan Data untuk Excel (Tanpa Status)
+    const worksheetData = pendaftar.map((user, index) => {
+      const mtk = parseNilai(user.nilai_matematika);
+      const ind = parseNilai(user.nilai_bhs_indonesia);
+      const ipa = parseNilai(user.nilai_ipa);
+      const ing = parseNilai(user.nilai_bhs_inggris);
+
+      return {
+        "No": index + 1,
+        "Nama Lengkap": user.nama_lengkap,
+        "NISN": user.nisn,
+        "NIK": user.nik,
+        "Tempat Lahir": user.tempat_lahir,
+        "Tanggal Lahir": user.tanggal_lahir ? new Date(user.tanggal_lahir).toLocaleDateString('id-ID') : '',
+        "Jenis Kelamin": user.jenis_kelamin,
+        "Agama": user.agama,
+        "Asal Sekolah": user.asal_sekolah,
+        "Alamat": user.alamat_rumah,
+        "No Telepon": user.no_telepon,
+        "Email": user.email,
+        "Nama Ayah": user.nama_ayah,
+        "Pekerjaan Ayah": user.pekerjaan_ayah,
+        "Nama Ibu": user.nama_ibu,
+        "Pekerjaan Ibu": user.pekerjaan_ibu,
+        
+        // Nilai
+        "Mtk Sem 1": mtk.sem1, "Mtk Sem 2": mtk.sem2, "Mtk Sem 3": mtk.sem3, "Mtk Sem 4": mtk.sem4, "Mtk Sem 5": mtk.sem5,
+        "B.Indo Sem 1": ind.sem1, "B.Indo Sem 2": ind.sem2, "B.Indo Sem 3": ind.sem3, "B.Indo Sem 4": ind.sem4, "B.Indo Sem 5": ind.sem5,
+        "IPA Sem 1": ipa.sem1, "IPA Sem 2": ipa.sem2, "IPA Sem 3": ipa.sem3, "IPA Sem 4": ipa.sem4, "IPA Sem 5": ipa.sem5,
+        "B.Inggris Sem 1": ing.sem1, "B.Inggris Sem 2": ing.sem2, "B.Inggris Sem 3": ing.sem3, "B.Inggris Sem 4": ing.sem4, "B.Inggris Sem 5": ing.sem5
+      };
+    });
+
+    // Buat Workbook dan Worksheet
+    const workbook = XLSX.utils.book_new();
+    const worksheet = XLSX.utils.json_to_sheet(worksheetData);
+
+    // Auto-width columns (Opsional - agar rapi)
+    const wscols = Object.keys(worksheetData[0] || {}).map(() => ({ wch: 20 }));
+    worksheet['!cols'] = wscols;
+
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Data Pendaftar");
+    
+    // Download File
+    XLSX.writeFile(workbook, `Data_Pendaftar_PPDB_${new Date().toISOString().split('T')[0]}.xlsx`);
+  };
+
   const handleToggleRegistration = (currentStatus) => {
     const nextStatus = currentStatus === 'open' ? 'closed' : 'open';
     const actionText = nextStatus === 'open' ? 'MEMBUKA' : 'MENUTUP';
@@ -524,18 +591,13 @@ const AdminDashboard = () => {
     return (item.nama_lengkap || '').toLowerCase().includes(term) || (item.asal_sekolah || '').toLowerCase().includes(term);
   });
 
-  // --- RENDER ---
   return (
     <div className="min-h-screen bg-slate-50 font-sans flex text-slate-800">
       <CustomAlert {...alertState} onCancel={closeAlert} />
-      
       <Sidebar isOpen={true} activeMenu={activeMenu} setActiveMenu={setActiveMenu} handleLogout={() => { localStorage.removeItem('userApp'); window.location.href='/'; }} />
-      
       <main className="flex-1 flex flex-col md:ml-64 transition-all">
         <Header searchTerm={searchTerm} setSearchTerm={setSearchTerm} userCount={pendaftar.length} />
-        
         <div className="p-8 flex-1">
-          {/* MENU 1: DATA PENDAFTAR */}
           {activeMenu === 'pendaftar' && (
             <>
                 <div className="mb-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
@@ -543,8 +605,6 @@ const AdminDashboard = () => {
                         <h1 className="text-2xl font-bold text-slate-800">Data Pendaftar</h1>
                         <p className="text-slate-500">Total: <span className="font-bold text-blue-600">{pendaftar.length}</span> Siswa</p>
                     </div>
-
-                    {/* KARTU KONTROL AKSES PENDAFTARAN */}
                     <div className="bg-white border rounded-xl p-3 shadow-sm flex items-center gap-4">
                         <div className={`p-2 rounded-lg ${regStatus === 'open' ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'}`}>
                             {regStatus === 'open' ? <Unlock size={20} /> : <Lock size={20} />}
@@ -555,18 +615,17 @@ const AdminDashboard = () => {
                                 {regStatus === 'open' ? 'DIBUKA' : 'DITUTUP'}
                             </p>
                         </div>
-                        <button 
-                            disabled={isUpdatingStatus}
-                            onClick={() => handleToggleRegistration(regStatus)}
-                            className={`ml-4 px-4 py-1.5 rounded-lg text-xs font-bold transition-all active:scale-95 flex items-center gap-2 ${regStatus === 'open' ? 'bg-red-50 text-red-600 hover:bg-red-100' : 'bg-green-50 text-green-600 hover:bg-green-100'}`}
-                        >
+                        <button disabled={isUpdatingStatus} onClick={() => handleToggleRegistration(regStatus)} className={`ml-4 px-4 py-1.5 rounded-lg text-xs font-bold transition-all active:scale-95 flex items-center gap-2 ${regStatus === 'open' ? 'bg-red-50 text-red-600 hover:bg-red-100' : 'bg-green-50 text-green-600 hover:bg-green-100'}`}>
                             {isUpdatingStatus ? <Loader2 size={14} className="animate-spin" /> : (regStatus === 'open' ? 'Tutup Pendaftaran' : 'Buka Pendaftaran')}
                         </button>
                     </div>
-
-                    <button onClick={fetchPendaftar} className="bg-white border hover:bg-slate-50 px-4 py-2 rounded-lg flex items-center gap-2 text-sm"><RefreshCw size={16} /> Refresh</button>
+                    <div className="flex gap-2">
+                        <button onClick={downloadExcel} className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 text-sm font-bold transition-colors shadow-sm">
+                             <FileSpreadsheet size={18} /> Export Excel
+                        </button>
+                        <button onClick={fetchPendaftar} className="bg-white border hover:bg-slate-50 px-4 py-2 rounded-lg flex items-center gap-2 text-sm text-slate-600"><RefreshCw size={16} /> Refresh</button>
+                    </div>
                 </div>
-
                 <div className="bg-white rounded-xl border shadow-sm overflow-hidden">
                     <div className="overflow-x-auto">
                     <table className="w-full text-left text-sm text-slate-600">
@@ -604,14 +663,9 @@ const AdminDashboard = () => {
                 </div>
             </>
           )}
-
-          {/* MENU 2: PRESTASI */}
           {activeMenu === 'prestasi' && <PrestasiManager showAlert={showAlert} />}
-
-          {/* MENU 3: PENGUMUMAN */}
           {activeMenu === 'pengumuman' && <PengumumanManager showAlert={showAlert} />}
         </div>
-        
         <Footer />
       </main>
     </div>

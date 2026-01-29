@@ -2,13 +2,19 @@ import React, { useState, useEffect } from 'react';
 import { Menu, X, ArrowRight, GraduationCap, ChevronDown } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 
-const LOCAL_URL = "http://localhost:5000";
 const PROD_URL = "https://website-sma-y1ls-4vy3hvenx-bangdastins-projects.vercel.app";
-const API_BASE_URL = window.location.hostname === 'localhost' ? LOCAL_URL : PROD_URL; 
+const hostname = window.location.hostname;
+export const API_BASE_URL = (hostname === 'localhost') 
+  ? "http://localhost:5000" 
+  : (hostname.includes('vercel.app')) 
+    ? PROD_URL 
+    : `http://${hostname}:5000`;
+
 
 const Navbar = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [regStatus, setRegStatus] = useState('open'); // Default 'open' agar tidak layout shift drastis saat loading
+  // State regStatus tetap ada untuk keperluan lain jika butuh, tapi tidak lagi menyembunyikan tombol
+  const [regStatus, setRegStatus] = useState('open'); 
   const navigate = useNavigate();
 
   // --- CEK STATUS PENDAFTARAN ---
@@ -59,13 +65,11 @@ const Navbar = () => {
             <Link to="/pengumuman" className="px-4 py-2 text-slate-600 hover:text-blue-600 font-medium transition-colors">Pengumuman</Link>
           </div>
 
-          {/* CTA BUTTON (Desktop) - HANYA MUNCUL JIKA OPEN */}
+          {/* CTA BUTTON (Desktop) - SELALU MUNCUL */}
           <div className="hidden md:flex">
-            {regStatus === 'open' && (
-                <button onClick={() => navigate('/auth')} className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2.5 rounded-full font-bold shadow-lg shadow-blue-200 transition-all hover:scale-105 flex items-center gap-2">
-                  Daftar Siswa Baru <ArrowRight size={18} />
-                </button>
-            )}
+              <button onClick={() => navigate('/auth')} className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2.5 rounded-full font-bold shadow-lg shadow-blue-200 transition-all hover:scale-105 flex items-center gap-2">
+                Daftar Siswa Baru <ArrowRight size={18} />
+              </button>
           </div>
 
           {/* MOBILE TOGGLE */}
@@ -87,14 +91,12 @@ const Navbar = () => {
             <Link to="/prestasi" onClick={() => setIsMobileMenuOpen(false)} className="block w-full text-left px-3 py-3 text-slate-600 font-medium hover:bg-blue-50 rounded-lg">Prestasi</Link>
             <Link to="/pengumuman" onClick={() => setIsMobileMenuOpen(false)} className="block w-full text-left px-3 py-3 text-slate-600 font-medium hover:bg-blue-50 rounded-lg">Pengumuman</Link>
             
-            {/* CTA BUTTON (Mobile) - HANYA MUNCUL JIKA OPEN */}
-            {regStatus === 'open' && (
-                <div className="pt-4 mt-4 border-t border-slate-100">
-                  <button onClick={() => {navigate('/auth'); setIsMobileMenuOpen(false);}} className="w-full bg-blue-600 text-white px-4 py-3 rounded-xl font-bold flex justify-center items-center gap-2">
-                    Daftar Sekarang <ArrowRight size={18} />
-                  </button>
-                </div>
-            )}
+            {/* CTA BUTTON (Mobile) - SELALU MUNCUL */}
+            <div className="pt-4 mt-4 border-t border-slate-100">
+                <button onClick={() => {navigate('/auth'); setIsMobileMenuOpen(false);}} className="w-full bg-blue-600 text-white px-4 py-3 rounded-xl font-bold flex justify-center items-center gap-2">
+                  Daftar Sekarang <ArrowRight size={18} />
+                </button>
+            </div>
           </div>
         </div>
       )}

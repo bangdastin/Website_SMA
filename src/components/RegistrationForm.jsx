@@ -39,6 +39,7 @@ const RegistrationForm = ({ onSuccess, onGoHome, userData }) => {
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [suggestions, setSuggestions] = useState([]); 
   const [showSuggestions, setShowSuggestions] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   
   const dropdownRef = useRef(null);
   const fileInputRef = useRef(null); 
@@ -107,7 +108,7 @@ const RegistrationForm = ({ onSuccess, onGoHome, userData }) => {
         if (selectedDate < minBirthDate) { showError("Mohon maaf, umur maksimal pendaftar adalah 17 tahun."); return; }
     }
     if (name === 'nik') {
-        if (value !== '' && !/^\d+$/.test(value)) { return; } // Hanya angka saat ngetik
+        if (value !== '' && !/^\d+$/.test(value)) { return; } 
     }
     if (name === 'nisn') {
         if (value !== '' && !/^\d+$/.test(value)) { return; }
@@ -173,36 +174,56 @@ const RegistrationForm = ({ onSuccess, onGoHome, userData }) => {
   const triggerPhotoInput = () => fileInputRef.current.click();
 
   const fetchSchools = async (query) => {
-    if (!query || query.length < 3) return;
+    if (!query || query.length < 3) {
+        setSuggestions([]);
+        return;
+    }
     setIsLoading(true);
     try {
       const response = await fetch(`${API_BASE_URL}/api/search-school?query=${query}`);
       const data = await response.json(); 
-      if (Array.isArray(data) && data.length > 0) { setSuggestions(data); setShowSuggestions(true); } else { setSuggestions([]); }
-    } catch (error) { setSuggestions([]); } finally { setIsLoading(false); }
+      if (Array.isArray(data) && data.length > 0) { 
+          setSuggestions(data); 
+          setShowSuggestions(true); 
+      } else { 
+          setSuggestions([]); 
+      }
+    } catch (error) { 
+        console.error("Error fetching schools:", error);
+        setSuggestions([]); 
+    } finally { 
+        setIsLoading(false); 
+    }
   };
 
   useEffect(() => {
-    const timer = setTimeout(() => { if (formData.asalSekolah.length > 2) fetchSchools(formData.asalSekolah); }, 800); 
+    const timer = setTimeout(() => { 
+        if (formData.asalSekolah.length > 2 && showSuggestions) {
+            fetchSchools(formData.asalSekolah); 
+        }
+    }, 800); 
     return () => clearTimeout(timer);
-  }, [formData.asalSekolah]);
+  }, [formData.asalSekolah, showSuggestions]);
 
   const handleSelectSchool = (item) => {
     const name = item.value || item.name || ""; 
-    if (!name.toUpperCase().includes("SMP") && !name.toUpperCase().includes("MTS")) { showError("Peringatan: Pastikan sekolah yang dipilih adalah tingkat SMP/MTs."); setFormData(prev => ({ ...prev, asalSekolah: "" })); return; }
-    setFormData(prev => ({ ...prev, asalSekolah: name })); setSuggestions([]); setShowSuggestions(false); 
+    // Validasi tetap ada sesuai request (tanpa merusak kode)
+    if (!name.toUpperCase().includes("SMP") && !name.toUpperCase().includes("MTS")) { 
+        showError("Peringatan: Pastikan sekolah yang dipilih adalah tingkat SMP/MTs."); 
+        setFormData(prev => ({ ...prev, asalSekolah: "" })); 
+        return; 
+    }
+    setFormData(prev => ({ ...prev, asalSekolah: name })); 
+    setSuggestions([]); 
+    setShowSuggestions(false); 
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!formData.asalSekolah.toUpperCase().includes("SMP") && !formData.asalSekolah.toUpperCase().includes("MTS")) { showError("Mohon perbaiki Asal Sekolah (Harus SMP/MTs)."); return; }
     
-    // --- VALIDASI PANJANG KARAKTER SAAT SUBMIT ---
     if (formData.nisn.length !== 10) { showError("NISN harus 10 digit."); return; }
     if (formData.nik.length !== 16) { showError("NIK harus 16 digit."); return; }
-    // No Telp minimal 10, maksimal 13 biasanya, tapi request Anda minta fix 12?
-    // Jika STRICT 12: formData.noTelp.length !== 12
-    // Jika fleksibel (umum di Indo): 10-13 digit. Saya buat STRICT 12 sesuai request.
     if (formData.noTelp.length !== 12) { showError("Nomor Telepon harus 12 digit."); return; }
 
     if (!files.pasFoto && !existingFiles.pasFoto) { showError("Wajib upload Pas Foto."); return; }
@@ -276,10 +297,23 @@ const RegistrationForm = ({ onSuccess, onGoHome, userData }) => {
                 <div className="space-y-1"><label className="text-sm font-semibold">Agama</label>
                     <select required name="agama" value={formData.agama} onChange={handleChange} className="w-full px-3 py-2 border rounded-lg"><option value="">Pilih...</option>{['Islam', 'Kristen', 'Katholik', 'Hindu', 'Budha', 'Konghucu', 'Kepercayaan'].map(opt => <option key={opt} value={opt}>{opt}</option>)}</select>
                 </div>
+                
                 <div className="space-y-1 relative" ref={dropdownRef}>
                     <label className="text-sm font-semibold">Asal Sekolah</label>
-                    <input name="asalSekolah" value={formData.asalSekolah} onChange={handleChange} placeholder="Ketik Sekolah..." className="w-full px-3 py-2 border rounded-lg" autoComplete="off"/>
-                    {showSuggestions && suggestions.length > 0 && (<ul className="absolute z-10 w-full bg-white border mt-1 shadow-lg max-h-40 overflow-y-auto">{suggestions.map((item, idx) => <li key={idx} onClick={() => handleSelectSchool(item)} className="px-3 py-2 hover:bg-gray-100 cursor-pointer text-sm">{item.value}</li>)}</ul>)}
+                    <input name="asalSekolah" value={formData.asalSekolah} onChange={handleChange} placeholder="Ketik Sekolah (Min. 3 huruf)..." className="w-full px-3 py-2 border rounded-lg" autoComplete="off"/>
+                    
+                    {/* DROP DOWN SUGGESTION */}
+                    {showSuggestions && suggestions.length > 0 && (
+                        <ul className="absolute z-10 w-full bg-white border mt-1 shadow-lg max-h-40 overflow-y-auto rounded-lg">
+                            {suggestions.map((item, idx) => (
+                                <li key={idx} onClick={() => handleSelectSchool(item)} className="px-3 py-2 hover:bg-gray-100 cursor-pointer text-sm border-b last:border-0">
+                                    <div className="font-bold text-slate-700">{item.value}</div>
+                                    <div className="text-xs text-slate-500 truncate">{item.address}</div>
+                                </li>
+                            ))}
+                        </ul>
+                    )}
+                    {isLoading && <p className="text-xs text-blue-500 absolute right-3 top-9">Mencari...</p>}
                 </div>
                  <div className="space-y-1 md:col-span-2"><label className="text-sm font-semibold">Alamat Rumah</label><textarea required name="alamatRumah" value={formData.alamatRumah} onChange={handleChange} className="w-full px-3 py-2 border rounded-lg" rows="2" /></div>
             </div>

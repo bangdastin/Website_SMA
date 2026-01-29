@@ -17,6 +17,8 @@ const __dirname = path.dirname(__filename);
 
 const app = express();
 const PORT = process.env.PORT || 5000; 
+
+// Gunakan API Key SerpApi Anda
 const SERPAPI_KEY = process.env.SERPAPI_KEY || '543c23317076911b0c2648de7597a0ede38d4187a41a01d58c1047bf7e9149dc'; 
 
 app.use(cors({
@@ -77,31 +79,22 @@ const upload = multer({
     }
 });
 
-// ==========================================
-// 🔥 MIDDLEWARE / FUNGSI CEK STATUS 🔥
-// ==========================================
-// Fungsi helper untuk mengecek apakah pendaftaran buka/tutup sebelum memproses register
+// Helper check registration
 const checkRegistrationOpen = (res, callback) => {
     db.query("SELECT value FROM settings WHERE `key` = 'registration_status'", (err, results) => {
         if (err) return res.status(500).json({ error: "Gagal mengecek status pendaftaran." });
-        
-        const status = results.length > 0 ? results[0].value : 'closed'; // Default closed jika tidak ada setting
-        
+        const status = results.length > 0 ? results[0].value : 'closed';
         if (status === 'closed') {
             return res.status(403).json({ message: "MOHON MAAF, PENDAFTARAN SUDAH DITUTUP." });
         }
-        
-        // Jika open, lanjut ke fungsi callback (proses register)
         callback();
     });
 };
 
-// --- AUTHENTICATION ---
+// --- AUTH ROUTES ---
 
-// 1. REGISTER AKUN AWAL (Dibungkus checkRegistrationOpen)
 app.post('/api/auth/register', (req, res) => {
     checkRegistrationOpen(res, () => {
-        // --- LOGIKA REGISTER ASLI ---
         const { nik, username, email, password } = req.body;
         if (!nik || !username || !email || !password) return res.status(400).json({ message: "Data tidak lengkap!" });
 
@@ -124,7 +117,6 @@ app.post('/api/auth/register', (req, res) => {
                 });
             });
         });
-        // --- END LOGIKA REGISTER ASLI ---
     });
 });
 
@@ -163,7 +155,9 @@ app.post('/api/auth/forgot-password', (req, res) => {
             if (err) return res.status(500).json({ message: "Gagal generate token." });
 
             const baseUrl = req.headers.origin || 'http://localhost:5173';
-            const resetLink = `${baseUrl}/?view=reset&token=${token}`; 
+            
+            // 🔥 PERBAIKAN DISINI: Tambahkan '/auth' agar tidak lari ke Landing Page
+            const resetLink = `${baseUrl}/auth?view=reset&token=${token}`; 
 
             const mailOptions = {
                 from: `"Panitia PPDB" <${process.env.EMAIL_USER || 'raynoldsirait7@gmail.com'}>`,
@@ -178,7 +172,7 @@ app.post('/api/auth/forgot-password', (req, res) => {
 
             transporter.sendMail(mailOptions, (error) => {
                 if (error) return res.status(500).json({ message: "Gagal mengirim email." });
-                res.status(200).json({ message: "Link reset password telah dikirim ke email Anda." });
+                res.status(200).json({ message: "Reset Password Telah dikirimkan ke email anda." });
             });
         });
     });
@@ -197,7 +191,6 @@ app.post('/api/auth/reset-password', (req, res) => {
     });
 });
 
-// --- USER PROFILE & PPDB FORM ---
 app.get('/api/users/:id', (req, res) => {
     const { id } = req.params; 
     db.query("SELECT * FROM users1 WHERE id = ?", [id], (err, results) => {
@@ -219,7 +212,6 @@ app.get('/api/users/:id', (req, res) => {
     });
 });
 
-// 2. INSERT FORMULIR BARU (Dibungkus checkRegistrationOpen jika INSERT baru)
 app.post('/api/register', upload.fields([
     { name: 'pasFoto', maxCount: 1 },
     { name: 'raport1', maxCount: 1 },
@@ -239,9 +231,6 @@ app.post('/api/register', upload.fields([
         if(err) return res.status(500).json({message: "Database Error", error: err});
 
         if(results.length > 0) {
-            // JIKA UPDATE DATA -> BOLEH (Biasanya perbaikan berkas diperbolehkan meskipun pendaftaran tutup, 
-            // tapi jika Anda ingin menutup total edit juga, bungkus ini dengan checkRegistrationOpen)
-            
             let sql = `UPDATE users SET 
                 nama_lengkap=?, no_telepon=?, tanggal_lahir=?, tempat_lahir=?, jenis_kelamin=?, nik=?, nisn=?, agama=?, asal_sekolah=?, alamat_rumah=?,
                 nama_ayah=?, pekerjaan_ayah=?, nama_ibu=?, pekerjaan_ibu=?,
@@ -267,7 +256,6 @@ app.post('/api/register', upload.fields([
             });
 
         } else {
-            // JIKA INSERT DATA BARU -> HARUS CEK STATUS PENDAFTARAN
             checkRegistrationOpen(res, () => {
                 const sql = `INSERT INTO users (
                     email, nama_lengkap, no_telepon, tanggal_lahir, tempat_lahir, jenis_kelamin, nik, nisn, agama, asal_sekolah, alamat_rumah,
@@ -292,7 +280,6 @@ app.post('/api/register', upload.fields([
     });
 });
 
-// --- ADMIN API ---
 app.get('/api/users', (req, res) => {
     db.query("SELECT * FROM users ORDER BY id DESC", (err, results) => {
         if (err) return res.status(500).json({ error: err.message });
@@ -309,7 +296,6 @@ app.put('/api/users/:id/status', (req, res) => {
     });
 });
 
-// --- SETTINGS AKSES PENDAFTARAN ---
 app.get('/api/settings/registration-status', (req, res) => {
     db.query("SELECT value FROM settings WHERE `key` = 'registration_status'", (err, results) => {
         if (err) return res.status(500).json({ error: err.message });
@@ -327,7 +313,6 @@ app.put('/api/settings/registration-status', (req, res) => {
     });
 });
 
-// --- PRESTASI, PENGUMUMAN, SEARCH ---
 app.get('/api/prestasi', (req, res) => {
     db.query("SELECT * FROM prestasi ORDER BY tanggal DESC", (err, results) => res.json(err ? [] : results));
 });
@@ -398,16 +383,60 @@ app.delete('/api/pengumuman/:id', (req, res) => {
     db.query("DELETE FROM pengumuman WHERE id = ?", [req.params.id], (err) => res.json({message: "Dihapus"}));
 });
 
+// ==========================================
+//  PERBAIKAN FITUR SEARCH SCHOOL (REMOVE PLUS CODE) 
+// ==========================================
 app.get('/api/search-school', async (req, res) => {
     const { query } = req.query; 
+    
     if (!query || query.length < 3) return res.json([]); 
+
     try {
+        console.log(`🔍 Searching SerpApi for: ${query}`); 
+
         const response = await axios.get('https://serpapi.com/search.json', {
-            params: { engine: 'google_maps', q: `SMP ${query} Indonesia`, google_domain: 'google.co.id', hl: 'id', type: 'search', api_key: SERPAPI_KEY }
+            params: { 
+                engine: 'google_maps', 
+                q: `SMP ${query}`, 
+                google_domain: 'google.co.id', 
+                hl: 'id', 
+                gl: 'id', 
+                type: 'search', 
+                api_key: SERPAPI_KEY 
+            }
         });
-        const cleanResults = (response.data.local_results || []).map(place => ({ value: place.title, address: place.address }));
+
+        if (response.data.error) {
+            console.error("❌ SerpApi Error Response:", response.data.error);
+            return res.json([]);
+        }
+
+        const results = response.data.local_results || [];
+        
+        const cleanResults = results.map(place => {
+            let cleanAddress = place.address || '';
+
+            //  LOGIKA PENGHAPUSAN PLUS CODE 
+            // Regex ini mencari pola kode di awal string (misal: "7VG9+WM4, ") dan menghapusnya
+            // Penjelasan Regex: 
+            // ^ = awal kalimat
+            // [A-Z0-9+]+ = kombinasi huruf besar, angka, dan tanda plus
+            // \s*,\s* = diikuti spasi (opsional), koma, dan spasi lagi
+            cleanAddress = cleanAddress.replace(/^[A-Z0-9]+\+[A-Z0-9]+\s*,\s*/, '');
+
+            return { 
+                value: place.title,       
+                address: cleanAddress    
+            };
+        }).filter(item => item.value && item.address); 
+
+        console.log(`✅ Found ${cleanResults.length} schools for query '${query}'`);
         res.json(cleanResults);
-    } catch (error) { res.json([]); }
+
+    } catch (error) { 
+        console.error("❌ API Search Error:", error.response?.data || error.message);
+        res.json([]); 
+    }
 });
 
 if (!process.env.VERCEL) {

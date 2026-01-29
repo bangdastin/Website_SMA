@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowRight, Star, BookOpen, Lightbulb, Target, Lock, AlertTriangle } from 'lucide-react'; // Import ikon tambahan
+import { ArrowRight, Star, BookOpen, Lightbulb, Target, Lock, AlertTriangle } from 'lucide-react';
 
 // --- 1. IMPORT SLIDER & STYLE ---
 import Slider from "react-slick";
@@ -20,37 +20,50 @@ import siswa4 from '../assets/fotosiswa4.jpeg';
 
 const sliderImages = [foto1, foto2, foto3];
 
-const LOCAL_URL = "http://localhost:5000";
 const PROD_URL = "https://website-sma-y1ls-4vy3hvenx-bangdastins-projects.vercel.app";
-const API_BASE_URL = window.location.hostname === 'localhost' ? LOCAL_URL : PROD_URL; 
+const hostname = window.location.hostname;
+export const API_BASE_URL = (hostname === 'localhost') 
+  ? "http://localhost:5000" 
+  : (hostname.includes('vercel.app')) 
+    ? PROD_URL 
+    : `http://${hostname}:5000`;
 
-// --- KOMPONEN TULISAN BERJALAN (MARQUEE) ---
+    
+// --- KOMPONEN ALERT MARQUEE (DIPERBAIKI) ---
 const ClosedMarquee = () => (
-    <div className="bg-red-600 text-white py-2 overflow-hidden relative z-50">
-        <div className="animate-marquee whitespace-nowrap flex gap-10 font-bold text-sm uppercase tracking-widest">
-            <span className="flex items-center gap-2"><AlertTriangle size={16}/> MOHON MAAF, PENDAFTARAN PESERTA DIDIK BARU (PPDB) SAAT INI TELAH DITUTUP.</span>
+    // PERUBAHAN: Menggunakan 'fixed' top-20 (80px) agar menempel tepat di bawah Navbar
+    <div className="fixed top-20 left-0 w-full z-40 bg-red-600 text-white shadow-lg border-b border-red-800">
+        <div className="py-3 overflow-hidden relative flex items-center">
+            {/* Background Pattern agar lebih elegan */}
+            <div className="absolute inset-0 opacity-10 bg-[url('https://www.transparenttextures.com/patterns/diagonal-striped-brick.png')]"></div>
+            
+            <div className="animate-marquee whitespace-nowrap flex gap-10 font-bold text-sm md:text-base uppercase tracking-widest items-center">
+                <span className="flex items-center gap-2"><AlertTriangle className="text-yellow-300" size={20} fill="currentColor"/> MOHON MAAF, PENDAFTARAN PESERTA DIDIK BARU (PPDB) SAAT INI TELAH DITUTUP.</span>
+                <span className="flex items-center gap-2"><AlertTriangle className="text-yellow-300" size={20} fill="currentColor"/> SILAHKAN MENUNGGU PERIODE PENDAFTARAN TAHUN DEPAN.</span>
+                <span className="flex items-center gap-2"><AlertTriangle className="text-yellow-300" size={20} fill="currentColor"/> MOHON MAAF, PENDAFTARAN PESERTA DIDIK BARU (PPDB) SAAT INI TELAH DITUTUP.</span>
+            </div>
         </div>
-        {/* Tambahkan style untuk animasi marquee di head atau index.css jika belum ada */}
+        
         <style>{`
             @keyframes marquee {
-                0% { transform: translateX(100%); }
-                100% { transform: translateX(-100%); }
+                0% { transform: translateX(0); }
+                100% { transform: translateX(-50%); }
             }
             .animate-marquee {
-                display: inline-block;
-                animation: marquee 20s linear infinite;
+                display: flex;
+                animation: marquee 30s linear infinite;
+                width: max-content; /* Pastikan width menyesuaikan konten */
+                min-width: 100%;
             }
         `}</style>
     </div>
 );
 
 const LandingPage = () => {
-  // Safe Import Fix untuk React Slick
   // @ts-ignore
   const SlickSlider = Slider.default ? Slider.default : Slider;
 
-  // --- LOGIKA STATUS PENDAFTARAN ---
-  const [regStatus, setRegStatus] = useState('open'); // Default open saat loading
+  const [regStatus, setRegStatus] = useState('open'); 
 
   useEffect(() => {
     const checkStatus = async () => {
@@ -82,9 +95,10 @@ const LandingPage = () => {
   };
 
   return (
-    <div className="w-full overflow-x-hidden font-sans flex flex-col min-h-screen">
+    <div className="w-full overflow-x-hidden font-sans flex flex-col min-h-screen bg-slate-50">
       
-      {/* 1. MARQUEE ATAS (Hanya Muncul Jika Closed) */}
+      {/* 1. MARQUEE FIXED (Hanya Muncul Jika Closed) */}
+      {/* Posisinya sudah diatur fixed di dalam komponen ClosedMarquee */}
       {regStatus === 'closed' && <ClosedMarquee />}
 
       {/* ==================================================================
@@ -102,15 +116,15 @@ const LandingPage = () => {
                   alt={`Slide ${index + 1}`} 
                   className="w-full h-full object-cover"
                 />
-                {/* Overlay Gradient */}
-                <div className="absolute inset-0 bg-gradient-to-b from-black/70 via-black/40 to-black/80"></div>
+                {/* Overlay Gradient Lebih Gelap agar teks terbaca */}
+                <div className="absolute inset-0 bg-gradient-to-b from-black/80 via-black/50 to-slate-900"></div>
               </div>
             ))}
           </SlickSlider>
         </div>
 
         {/* Layer Konten Teks */}
-        <div className="absolute inset-0 z-10 flex flex-col justify-center items-center text-center px-6 max-w-6xl mx-auto space-y-8 animate-fade-in-up">
+        <div className="absolute inset-0 z-10 flex flex-col justify-center items-center text-center px-6 max-w-6xl mx-auto space-y-8 animate-fade-in-up mt-10 md:mt-0">
           
           <span className="inline-flex items-center gap-2 px-5 py-2 rounded-full bg-white/10 backdrop-blur-md border border-white/20 text-blue-100 font-semibold text-sm uppercase tracking-widest shadow-lg">
             <Star size={14} className="text-yellow-400 fill-yellow-400"/>
@@ -124,31 +138,30 @@ const LandingPage = () => {
             </span>
           </h1>
 
-          <p className="text-lg md:text-xl text-slate-200 max-w-3xl mx-auto leading-relaxed font-light">
-            SMA Negeri 2 Lintongnihuta hadir sebagai pusat pendidikan yang mengintegrasikan kecerdasan intelektual, kedisiplinan tinggi, dan nilai-nilai luhur budaya untuk mencetak pemimpin masa depan.
+          <p className="text-lg md:text-xl text-slate-200 max-w-3xl mx-auto leading-relaxed font-light drop-shadow-md">
+            SMA Negeri 2 Lintongnihuta hadir sebagai pusat pendidikan yang mengintegrasikan kecerdasan intelektual, kedisiplinan tinggi, dan nilai-nilai luhur budaya.
           </p>
 
           <div className="flex flex-col sm:flex-row gap-5 pt-6 w-full sm:w-auto items-center justify-center">
             
-            {/* --- LOGIKA TOMBOL DISINI --- */}
+            {/* --- LOGIKA TOMBOL DAFTAR --- */}
             {regStatus === 'open' ? (
-                // JIKA BUKA: Tampilkan Tombol Daftar Normal
                 <Link 
                   to="/auth" 
-                  className="px-8 py-4 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold text-lg transition-all transform hover:-translate-y-1 shadow-xl shadow-blue-900/50 flex items-center justify-center gap-2"
+                  className="px-8 py-4 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold text-lg transition-all transform hover:-translate-y-1 shadow-xl shadow-blue-900/50 flex items-center justify-center gap-2 w-full sm:w-auto"
                 >
                   Daftar Sekarang <ArrowRight size={20} />
                 </Link>
             ) : (
-                // JIKA TUTUP: Ganti dengan Kotak Merah "Pendaftaran Telah Ditutup" (Bukan Tombol)
-                <div className="px-8 py-4 bg-red-600/90 backdrop-blur-sm border border-red-500 text-white rounded-xl font-bold text-lg shadow-xl flex items-center justify-center gap-2 cursor-not-allowed select-none opacity-90">
-                   <Lock size={20} /> PENDAFTARAN TELAH DITUTUP
+                // JIKA TUTUP: Tampilan Tombol Disabled yang Rapi
+                <div className="px-8 py-4 bg-slate-800/80 backdrop-blur-sm border border-slate-600 text-slate-300 rounded-xl font-bold text-lg shadow-xl flex items-center justify-center gap-2 cursor-not-allowed select-none w-full sm:w-auto">
+                   <Lock size={20} /> PENDAFTARAN DITUTUP
                 </div>
             )}
             
             <Link 
               to="/visi-misi" 
-              className="px-8 py-4 bg-white/5 hover:bg-white/15 border border-white/40 text-white rounded-xl font-bold text-lg backdrop-blur-sm transition-all transform hover:-translate-y-1 flex items-center justify-center"
+              className="px-8 py-4 bg-white/5 hover:bg-white/15 border border-white/40 text-white rounded-xl font-bold text-lg backdrop-blur-sm transition-all transform hover:-translate-y-1 flex items-center justify-center w-full sm:w-auto"
             >
               Profil Sekolah
             </Link>
@@ -158,11 +171,11 @@ const LandingPage = () => {
 
 
       {/* ==================================================================
-          BAGIAN 3: TENTANG SEKOLAH (EXTENDED VERSION)
+          BAGIAN 3: TENTANG SEKOLAH
       ================================================================== */}
       <section className="py-24 bg-white relative overflow-hidden flex-grow">
         {/* Hiasan Background Abstrak */}
-        <div className="absolute top-0 right-0 w-1/2 h-full bg-slate-50 -skew-x-12 translate-x-32 -z-0"></div>
+        <div className="absolute top-0 right-0 w-1/2 h-full bg-blue-50/50 -skew-x-12 translate-x-32 -z-0"></div>
 
         <div className="max-w-7xl mx-auto px-6 lg:px-8 relative z-10">
           
@@ -182,33 +195,33 @@ const LandingPage = () => {
                   SMA Negeri 2 Lintongnihuta berdiri dengan visi mulia untuk menjadi lembaga pendidikan terdepan yang tidak hanya fokus pada pencapaian akademis, tetapi juga pada pembentukan karakter siswa yang tangguh, beretika, dan berwawasan global.
                 </p>
                 <p>
-                  Kami menerapkan kurikulum yang adaptif terhadap perkembangan teknologi dan kebutuhan zaman. Dengan dukungan fasilitas yang memadai dan tenaga pendidik yang berdedikasi, kami memastikan setiap siswa mendapatkan ruang untuk mengeksplorasi bakat dan minat mereka secara maksimal.
+                  Kami menerapkan kurikulum yang adaptif terhadap perkembangan teknologi dan kebutuhan zaman. Dengan dukungan fasilitas yang memadai dan tenaga pendidik yang berdedikasi.
                 </p>
               </div>
 
               <div className="grid gap-6">
-                <div className="flex gap-4 p-5 bg-white rounded-2xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow">
-                  <div className="flex-shrink-0 w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center text-blue-600">
+                <div className="flex gap-4 p-5 bg-white rounded-2xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow group">
+                  <div className="flex-shrink-0 w-12 h-12 bg-blue-100 group-hover:bg-blue-600 transition-colors rounded-full flex items-center justify-center text-blue-600 group-hover:text-white">
                     <BookOpen size={24} />
                   </div>
                   <div>
                     <h4 className="font-bold text-slate-900 text-lg">Kurikulum Terintegrasi</h4>
-                    <p className="text-slate-500 mt-1 text-sm">Menggabungkan kurikulum nasional dengan program pengayaan berbasis keterampilan abad 21.</p>
+                    <p className="text-slate-500 mt-1 text-sm">Menggabungkan kurikulum nasional dengan program pengayaan berbasis keterampilan.</p>
                   </div>
                 </div>
 
-                <div className="flex gap-4 p-5 bg-white rounded-2xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow">
-                  <div className="flex-shrink-0 w-12 h-12 bg-orange-100 rounded-full flex items-center justify-center text-orange-600">
+                <div className="flex gap-4 p-5 bg-white rounded-2xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow group">
+                  <div className="flex-shrink-0 w-12 h-12 bg-orange-100 group-hover:bg-orange-500 transition-colors rounded-full flex items-center justify-center text-orange-600 group-hover:text-white">
                     <Lightbulb size={24} />
                   </div>
                   <div>
                     <h4 className="font-bold text-slate-900 text-lg">Fasilitas Modern</h4>
-                    <p className="text-slate-500 mt-1 text-sm">Laboratorium lengkap, perpustakaan digital, dan sarana olahraga yang mendukung kreativitas siswa.</p>
+                    <p className="text-slate-500 mt-1 text-sm">Laboratorium lengkap, perpustakaan digital, dan sarana olahraga.</p>
                   </div>
                 </div>
 
-                <div className="flex gap-4 p-5 bg-white rounded-2xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow">
-                  <div className="flex-shrink-0 w-12 h-12 bg-green-100 rounded-full flex items-center justify-center text-green-600">
+                <div className="flex gap-4 p-5 bg-white rounded-2xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow group">
+                  <div className="flex-shrink-0 w-12 h-12 bg-green-100 group-hover:bg-green-600 transition-colors rounded-full flex items-center justify-center text-green-600 group-hover:text-white">
                     <Target size={24} />
                   </div>
                   <div>
@@ -226,7 +239,7 @@ const LandingPage = () => {
             </div>
 
 
-            {/* --- KOLOM KANAN: GALERI --- */}
+            {/* --- KOLOM KANAN: GALERI (MASONRY GRID) --- */}
             <div className="relative h-full flex items-center">
               <div className="grid grid-cols-2 gap-4 w-full">
                 
@@ -243,7 +256,7 @@ const LandingPage = () => {
                     <div className="group relative overflow-hidden rounded-2xl shadow-lg aspect-[3/4]">
                     <img src={siswa2} alt="Kegiatan Olahraga" className="w-full h-full object-cover transform group-hover:scale-110 transition-transform duration-700"/>
                       <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end p-4">
-                      <p className="text-white font-medium text-sm">Ekstrakurikuler & Olahraga</p>
+                      <p className="text-white font-medium text-sm">Ekstrakurikuler</p>
                     </div>
                   </div>
                 </div>
@@ -252,16 +265,16 @@ const LandingPage = () => {
                     <div className="group relative overflow-hidden rounded-2xl shadow-lg aspect-[4/3]">
                     <img src={siswa3} alt="Pengukuhan" className="w-full h-full object-cover transform group-hover:scale-110 transition-transform duration-700"/>
                       <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end p-4">
-                      <p className="text-white font-medium text-sm">Pengukuhan</p>
+                      <p className="text-white font-medium text-sm">Upacara</p>
                     </div>
                   </div>
                 </div>
 
                 <div className="space-y-4">
                     <div className="group relative overflow-hidden rounded-2xl shadow-lg aspect-[4/3]">
-                    <img src={siswa4} alt="Pengukuhan" className="w-full h-full object-cover transform group-hover:scale-110 transition-transform duration-700"/>
+                    <img src={siswa4} alt="Kegiatan" className="w-full h-full object-cover transform group-hover:scale-110 transition-transform duration-700"/>
                       <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end p-4">
-                      <p className="text-white font-medium text-sm">Pengukuhan</p>
+                      <p className="text-white font-medium text-sm">Kegiatan Sekolah</p>
                     </div>
                   </div>
                 </div>
@@ -273,9 +286,7 @@ const LandingPage = () => {
         </div>
       </section>
 
-      {/* 4. MARQUEE BAWAH (Hanya Muncul Jika Closed) */}
-      {regStatus === 'closed' && <ClosedMarquee />}
-
+      {/* Marquee Bawah tidak diperlukan lagi karena sudah ada fixed marquee di atas */}
     </div>
   );
 };
